@@ -15,7 +15,7 @@ local function track(id, x, z, cat)
            category = cat or "PLAYER", entityType = "minecraft:player", scannedTime = 1 }
 end
 
-sample(0, { track("a1", 100, 100), track("ship9", 300, 300, "VS2") }, { { name = "Bob", x = 101, y = 64, z = 100 } })
+sample(0, { track("a1", 100, 100), track("ship9", 300, 300, "VS2") }, { { name = "Bob", uuid = "a1", x = 101, y = 64, z = 100 } })
 sample(2, { track("a1", 102, 100) }, { { name = "Bob", x = 102, y = 64, z = 101 } })
 sample(4, { track("a1", 104, 100) }, { { name = "Bob", x = 104, y = 64, z = 100 } })
 sample(6, { track("a1", 106, 100), track("ship9", 310, 300, "VS2") }, { { name = "Bob", x = 106, y = 64, z = 100 } })
@@ -32,7 +32,9 @@ t.eq(s.pairs["Bob"].ids["a1"], 4, "Bob always maps to a1")
 local text = table.concat(core.summarize(s), "\n")
 t.contains(text, "2 unique", "summary unique ids")
 t.contains(text, "STABLE", "summary says id is stable")
-t.contains(text, "raw track:", "summary has raw track")
+t.contains(text, "raw PLAYER:", "summary has raw track per category")
+t.contains(text, "raw VS2:", "summary has raw ship track")
+t.contains(text, "detector uuid == track id in 1/4", "uuid comparison reported")
 
 -- an id that changes must be reported as changed
 local s2 = core.new()

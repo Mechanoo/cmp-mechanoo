@@ -18,7 +18,7 @@ function core.new()
     radars = {}, -- radar name -> counters
     players = {}, -- player name -> number of samples seen
     pairs = {}, -- player name -> matching info
-    rawTrack = nil,
+    rawByCat = {},
     rawPlayer = nil,
     cur = nil,
   }
@@ -41,7 +41,8 @@ function core.addTracks(s, radarName, tracks)
 
   for _, tr in ipairs(tracks) do
     local id = tostring(tr.id)
-    if not s.rawTrack then s.rawTrack = tr end
+    local cat = tostring(tr.category or "?")
+    if not s.rawByCat[cat] then s.rawByCat[cat] = tr end
     local rec = s.tracks[id]
     if not rec then
       rec = { id = id, n = 0, reappear = 0, radars = {}, firstIdx = s.samples, first = s.cur.t }
@@ -83,7 +84,7 @@ function core.endSample(s)
     end
     local pr = s.pairs[p.name]
     if not pr then
-      pr = { name = p.name, samples = 0, matched = 0, ids = {} }
+      pr = { name = p.name, samples = 0, matched = 0, uuidMatches = 0, ids = {} }
       s.pairs[p.name] = pr
     end
     pr.samples = pr.samples + 1
@@ -93,6 +94,7 @@ function core.endSample(s)
         pr.matched = pr.matched + 1
         local id = tostring(best.id)
         pr.ids[id] = (pr.ids[id] or 0) + 1
+        if p.uuid and id == tostring(p.uuid) then pr.uuidMatches = pr.uuidMatches + 1 end
       end
     end
   end
@@ -157,6 +159,7 @@ function core.summarize(s)
       local ids = {}
       for _, id in ipairs(sortedKeys(pr.ids)) do ids[#ids + 1] = id .. " x" .. pr.ids[id] end
       if #ids > 0 then line = line .. ", ids: " .. table.concat(ids, " ") end
+      if pr.matched > 0 then line = line .. (", detector uuid == track id in %d/%d"):format(pr.uuidMatches, pr.matched) end
     end
     L[#L + 1] = line
     if pr and pr.matched >= 3 then
@@ -166,7 +169,9 @@ function core.summarize(s)
     end
   end
 
-  if s.rawTrack then L[#L + 1] = "raw track: " .. textutils.serialise(s.rawTrack, { compact = true }) end
+  for _, cat in ipairs(sortedKeys(s.rawByCat)) do
+    L[#L + 1] = "raw " .. cat .. ": " .. textutils.serialise(s.rawByCat[cat], { compact = true })
+  end
   if s.rawPlayer then L[#L + 1] = "raw player: " .. textutils.serialise(s.rawPlayer, { compact = true }) end
   return L
 end

@@ -53,7 +53,7 @@ local function readPlayers(det)
     local name = type(e) == "table" and e.name or e
     local info = (type(e) == "table" and e.x) and e or select(2, pcall(peripheral.call, det, "getPlayer", name))
     if type(info) == "table" and info.x then
-      players[#players + 1] = { name = tostring(name), x = info.x, y = info.y, z = info.z }
+      players[#players + 1] = { name = tostring(name), uuid = info.uuid, x = info.x, y = info.y, z = info.z }
     end
   end
   return players
