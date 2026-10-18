@@ -1,0 +1,33 @@
+{
+ "version": "ed72bd72c8",
+ "files": [
+  {
+   "path": "apps/discord-test/main.lua",
+   "size": 1252
+  },
+  {
+   "path": "apps/probe/main.lua",
+   "size": 4081
+  },
+  {
+   "path": "bin/cmp.lua",
+   "size": 1747
+  },
+  {
+   "path": "lib/discord.lua",
+   "size": 2774
+  },
+  {
+   "path": "lib/probe_core.lua",
+   "size": 5295
+  },
+  {
+   "path": "lib/store.lua",
+   "size": 1090
+  },
+  {
+   "path": "lib/updater.lua",
+   "size": 3910
+  }
+ ]
+}

@@ -3,7 +3,9 @@ States: idea / in progress / tested in game
 
 | # | Project | State |
 |---|---|---|
-| 12 | Installer + shared UI library | idea |
+| 12 | Installer + updater | in progress (written, tested locally, not yet tested in game) |
+| 12b | Shared UI library (terminal + DirectGPU backends) | idea |
+| 0 | Discord test + radar/detector probe | in progress (not yet tested in game) |
 | 1 | Storage dashboard (Stock Ticker) | idea |
 | 2 | Auto reorder | idea |
 | 3 | Create monitor (stress/speed) | idea |
