@@ -99,6 +99,16 @@ function core.endSample(s)
   s.cur = nil
 end
 
+-- Decide what a peripheral is from its methods (type names differ between versions).
+-- Returns "radar", "detector" or nil.
+function core.classify(types, methods)
+  local has = {}
+  for _, m in ipairs(methods or {}) do has[m] = true end
+  if has.getPlayersInRange then return "detector" end
+  if has.getTracks and not has.getSelectedTrack then return "radar" end
+  return nil
+end
+
 local function sortedKeys(t)
   local keys = {}
   for k in pairs(t) do keys[#keys + 1] = k end

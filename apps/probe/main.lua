@@ -13,13 +13,6 @@ for _, a in ipairs(args) do
   elseif tonumber(a) then seconds = tonumber(a) end
 end
 
-local function hasType(name, pattern)
-  for _, t in ipairs({ peripheral.getType(name) }) do
-    if t:find(pattern, 1, true) then return true end
-  end
-  return false
-end
-
 -- 1. inventory of everything attached
 local report = {}
 local function out(line)
@@ -33,18 +26,14 @@ for _, name in ipairs(peripheral.getNames()) do
   local types = table.concat({ peripheral.getType(name) }, ",")
   local methods = peripheral.getMethods(name) or {}
   out(("  %s [%s] %d methods"):format(name, types, #methods))
-  local hasTracks = false
-  for _, m in ipairs(methods) do
-    if m == "getTracks" then hasTracks = true end
-  end
-  if hasTracks and hasType(name, "radar") and not hasType(name, "monitor") then
-    radars[#radars + 1] = name
-  end
-  if hasType(name, "player_detector") then detectors[#detectors + 1] = name end
+  local kind = core.classify({ peripheral.getType(name) }, methods)
+  if kind == "radar" then radars[#radars + 1] = name end
+  if kind == "detector" then detectors[#detectors + 1] = name end
 end
 out(("Found %d radar(s), %d player detector(s)."):format(#radars, #detectors))
 if #radars == 0 and #detectors == 0 then
-  printError("Nothing to measure. Attach a Plane Radar and/or a Player Detector (directly or via wired modem).")
+  printError("Nothing to measure: no radar (getTracks) and no player detector (getPlayersInRange) found.")
+  printError("Checklist: every device needs its own wired modem, each modem must be right-clicked until it shows red, and the computer needs a modem on the same cable network.")
   store.writeText("probe-peripherals.txt", table.concat(report, "\n"))
   return
 end
