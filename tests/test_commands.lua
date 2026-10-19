@@ -76,6 +76,12 @@ out = run("ships")
 t.contains(out, "Flagship", "ships shows label")
 out = run("ship 8c98 visitor 1h")
 t.contains(out, "1h00m", "ship visitor")
+-- an old id after a reassembly is shown as replaced, not as a lost ship
+ls.ships["oldship1"] = { id = "oldship1", list = "trusted", label = "Home", replacedBy = "newship1-xyz",
+  replacedAt = now - 20000, lastSeen = now - 25000 }
+out = run("ships")
+t.contains(out, "old    ship oldship1 'Home' -> now newship1, gone in 40s", "old id marked as replaced")
+ls.ships["oldship1"] = nil
 out = run("ship zzz trust")
 t.contains(out, "no ship", "unknown ship")
 

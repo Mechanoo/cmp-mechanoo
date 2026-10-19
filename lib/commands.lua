@@ -165,8 +165,17 @@ function C.run(ctx, line)
     end
     for id, e in pairs(ls.ships) do
       if not ctx.tracker.targets[id] then
-        local extra = e.lastSeen and (" last seen " .. D.format(now - e.lastSeen) .. " ago") or ""
-        say(("listed %-8s ship %s%s%s"):format(e.list, tracker.short(id), e.label and (" '" .. e.label .. "'") or "", extra))
+        local label = e.label and (" '" .. e.label .. "'") or ""
+        if e.replacedBy then
+          -- the old id of a reassembled ship, kept for a while in case it was only radar flicker
+          local window = ctx.tracker.cfg.takeoverWindowMs or 60000
+          local left = window - (now - (e.replacedAt or now))
+          say(("old    ship %s%s -> now %s, gone in %s"):format(tracker.short(id), label,
+            tracker.short(e.replacedBy), D.format(left > 0 and left or 0)))
+        else
+          local extra = e.lastSeen and (" last seen " .. D.format(now - e.lastSeen) .. " ago") or ""
+          say(("listed %-8s ship %s%s%s"):format(e.list, tracker.short(id), label, extra))
+        end
         any = true
       end
     end
