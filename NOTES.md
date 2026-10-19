@@ -17,3 +17,10 @@ Peripheral names and quirks found in the world. Add output of `peripherals` here
 - Aiming speed depends on the kinetic (shaft) speed of the mount.
 - fire(true) keeps the fire signal on until fire(false).
 - When the last computer detaches (computer stops, chunk unloads) the mount leaves computer control and disassembles (unless it has a redstone signal). After every boot: assemble(true) and setComputerControl(true) again.
+
+## Probe report 2 (singleplayer)
+- Player track `id` == Player Detector `uuid` (42 of 42 player matches). Players are identified by UUID; no position matching needed.
+- The one "changed id" was a Sable ship next to the player (old probe matched by distance; fixed: players only match PLAYER tracks).
+- `velocity` is in blocks per tick: a player standing still showed y = -0.0784 (vanilla gravity per tick).
+- Two different SABLE ids appeared (open: two ships, or one ship that got a new id after reassembly?).
+- cannon_mount getInfo while not assembled: assembled=false, computerControl=false, yaw=90, pitch=0, shaft speeds 0.
