@@ -107,6 +107,7 @@ function core.classify(types, methods)
   local has = {}
   for _, m in ipairs(methods or {}) do has[m] = true end
   if has.getPlayersInRange then return "detector" end
+  if has.setTargetAngles and has.getInfo then return "cannon" end
   if has.getTracks and not has.getSelectedTrack then return "radar" end
   return nil
 end

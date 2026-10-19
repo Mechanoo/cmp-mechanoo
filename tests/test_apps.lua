@@ -33,9 +33,11 @@ local P = {
   north = { types = { "create_radar:plane_radar" }, methods = { "getTracks", "getPosition", "getRange" } },
   det = { types = { "player_detector" }, methods = { "getPlayersInRange", "getPlayer" } },
   chest = { types = { "minecraft:chest" }, methods = { "list" } },
+  gun = { types = { "cannon_mount" }, methods = { "setComputerControl", "setTargetAngles", "getInfo", "assemble", "fire" } },
 }
+local cannonCalls = {}
 peripheral = {
-  getNames = function() return { "north", "det", "chest" } end,
+  getNames = function() return { "north", "det", "chest", "gun" } end,
   getType = function(n) return table.unpack(P[n].types) end,
   getMethods = function(n) return P[n].methods end,
   call = function(n, m, ...)
@@ -49,6 +51,9 @@ peripheral = {
     elseif n == "north" and m == "getPosition" then return { x = 0, y = 64, z = 0 }
     elseif n == "det" and m == "getPlayersInRange" then return { "Bob" }
     elseif n == "det" and m == "getPlayer" then return { x = 100 + step, y = 70, z = 50, name = "Bob" }
+    elseif n == "gun" then
+      cannonCalls[#cannonCalls + 1] = m
+      if m == "getInfo" then return { assembled = true, yaw = 90, pitch = 5, x = 1, y = 2, z = 3 } end
     end
   end,
 }
@@ -84,7 +89,9 @@ posts = {}
 local probe = loadApp("/work/apps/probe/main.lua")
 probe("10", "--discord")
 local report = readAll("/cmp-data/probe-report.txt")
-t.contains(report, "Found 1 radar(s), 1 player detector(s).", "found devices")
+t.contains(report, "Found 1 radar(s), 1 player detector(s), 1 cannon mount(s).", "found devices")
+t.contains(report, "cannon gun info=", "cannon info reported")
+for _, m in ipairs(cannonCalls) do t.eq(m, "getInfo", "probe only reads the cannon") end
 t.contains(report, "chest", "inventory lists the chest")
 t.contains(report, "radar match", "pairing is reported")
 t.contains(report, "STABLE", "stable id detected")

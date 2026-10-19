@@ -20,7 +20,7 @@ local function out(line)
   report[#report + 1] = line
 end
 
-local radars, detectors = {}, {}
+local radars, detectors, cannons = {}, {}, {}
 out("Peripherals:")
 for _, name in ipairs(peripheral.getNames()) do
   local types = table.concat({ peripheral.getType(name) }, ",")
@@ -29,8 +29,14 @@ for _, name in ipairs(peripheral.getNames()) do
   local kind = core.classify({ peripheral.getType(name) }, methods)
   if kind == "radar" then radars[#radars + 1] = name end
   if kind == "detector" then detectors[#detectors + 1] = name end
+  if kind == "cannon" then cannons[#cannons + 1] = name end
 end
-out(("Found %d radar(s), %d player detector(s)."):format(#radars, #detectors))
+out(("Found %d radar(s), %d player detector(s), %d cannon mount(s)."):format(#radars, #detectors, #cannons))
+-- cannon mounts are only read (getInfo), never moved or fired
+for _, name in ipairs(cannons) do
+  local ok, info = pcall(peripheral.call, name, "getInfo")
+  out(("  cannon %s info=%s"):format(name, ok and textutils.serialise(info, { compact = true }) or ("error: " .. tostring(info))))
+end
 if #radars == 0 and #detectors == 0 then
   printError("Nothing to measure: no radar (getTracks) and no player detector (getPlayersInRange) found.")
   printError("Checklist: every device needs its own wired modem, each modem must be right-clicked until it shows red, and the computer needs a modem on the same cable network.")

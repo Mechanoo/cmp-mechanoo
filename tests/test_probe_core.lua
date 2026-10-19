@@ -58,6 +58,7 @@ t.eq(s3.tracks["dup"].n, 1, "duplicate across radars counted once")
 t.eq(core.classify({ "whatever" }, { "getTracks", "getRange" }), "radar", "radar by methods")
 t.eq(core.classify({ "playerDetector" }, { "getPlayersInRange", "getPlayer" }), "detector", "detector by methods")
 t.eq(core.classify({ "create_radar:monitor" }, { "getTracks", "getSelectedTrack" }), nil, "monitor is not a radar")
+t.eq(core.classify({ "cannon_mount" }, { "setTargetAngles", "getInfo", "fire" }), "cannon", "cannon mount by methods")
 t.eq(core.classify({ "minecraft:chest" }, { "list" }), nil, "chest is nothing")
 
 t.finish("probe_core")
