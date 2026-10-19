@@ -55,12 +55,13 @@ local function tracks()
 end
 
 local chatCalls, soundCalls, rsCalls, rangesAsked = {}, 0, {}, {}
+local soundNames, audioCalls = {}, {}
 local P = {
   r0 = { types = { "create_radar:plane_radar" }, methods = { "getTracks", "getPosition", "getRange" } },
   r1 = { types = { "create_radar:plane_radar" }, methods = { "getTracks", "getPosition", "getRange" } },
   det = { types = { "player_detector" }, methods = { "getPlayersInRange", "getPlayer" } },
   chat = { types = { "chat_box" }, methods = { "sendMessage", "sendMessageToPlayer" } },
-  spk = { types = { "speaker" }, methods = { "playNote", "playSound" } },
+  spk = { types = { "speaker" }, methods = { "playNote", "playSound", "playAudio", "stop" } },
 }
 peripheral = {
   getNames = function() return { "r0", "r1", "det", "chat", "spk" } end,
@@ -87,7 +88,8 @@ peripheral = {
       if a[1] == "u-ghost" then return { name = "minecraft:player", displayName = "Ghost", uuid = "u-ghost", x = 150, y = 64, z = 150 } end
     end
     if m == "sendMessageToPlayer" then chatCalls[#chatCalls + 1] = { msg = a[1], to = a[2] } return true end
-    if m == "playSound" then soundCalls = soundCalls + 1 return true end
+    if m == "playSound" then soundCalls = soundCalls + 1 soundNames[#soundNames + 1] = a[1] return true end
+    if m == "playAudio" then audioCalls[#audioCalls + 1] = a[1] return true end
   end,
 }
 redstone = { setOutput = function(side, on) rsCalls[#rsCalls + 1] = { side, on } end }
@@ -131,10 +133,15 @@ t.eq(A:find("s-new", 1, true), nil, "reassembled ship is not an alert")
 t.eq(A:find("ghost-", 1, true), nil, "one-sample ghost ships cause no alert")
 t.eq(L:find("ghost-", 1, true), nil, "and no visit record")
 
-t.eq(#chatCalls, 1, "one chat warning")
-t.eq(chatCalls[1] and chatCalls[1].to, "Stranger", "warning to the stranger")
-t.contains(chatCalls[1] and chatCalls[1].msg or "", "no-go zone", "warning text")
-t.truthy(soundCalls >= 2, "alarm sound played")
+t.eq(#chatCalls, 0, "no chat messages to players")
+t.truthy(soundCalls >= 2, "bell for new contacts")
+t.eq(soundNames[1], "minecraft:block.bell.use", "bell sound")
+t.truthy(#audioCalls >= 1, "siren audio played")
+local buf = audioCalls[1] or {}
+t.eq(#buf, 48000, "siren buffer is 1 s at 48 kHz")
+local okRange = true
+for i = 1, #buf, 997 do if buf[i] < -128 or buf[i] > 127 or buf[i] % 1 ~= 0 then okRange = false end end
+t.truthy(okRange, "samples are whole numbers in -128..127")
 local sawOn = false
 for _, c in ipairs(rsCalls) do if c[1] == "top" and c[2] == true then sawOn = true end end
 t.truthy(sawOn, "redstone alarm on")

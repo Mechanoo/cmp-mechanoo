@@ -33,6 +33,9 @@ C.HELP = {
   "timezone <hours>   e.g. timezone 2 for UTC+2",
   "basename <text>    name of the base in Discord",
   "detectrange <blocks>   player detector range (default 512)",
+  "alarm              siren state",
+  "alarm mute [time]  silence the siren (default 10m)",
+  "alarm on | alarm test | alarm volume <0-3>",
 }
 
 local function words(line)
@@ -275,6 +278,45 @@ function C.run(ctx, line)
     say("times in " .. (off == 0 and "UTC" or ("UTC" .. (off > 0 and "+" or "") .. off)))
     local lines = w[2] and history.details(ctx.history, w[2], off) or history.summary(ctx.history, off, 30)
     for _, l in ipairs(lines) do say(l) end
+
+  elseif cmd == "alarm" then
+    local sub = (w[2] or ""):lower()
+    if sub == "" then
+      local state = (cfg.alarmMuteUntil and now < cfg.alarmMuteUntil)
+        and ("muted until " .. untilText(cfg.alarmMuteUntil)) or "on"
+      say("alarm " .. state .. ", volume " .. tostring(cfg.alarmVolume or 3)
+        .. (ctx.speakers and (", " .. ctx.speakers .. " speaker(s)") or ""))
+    elseif sub == "mute" then
+      local ms = 10 * 60000
+      if w[3] then
+        ms = D.parse(w[3])
+        if not ms then
+          say("bad time '" .. w[3] .. "', use e.g. 10m, 1h")
+          return out
+        end
+      end
+      cfg.alarmMuteUntil = now + ms
+      out.configChanged = true
+      say("siren muted until " .. untilText(now + ms) .. " (Discord keeps reporting)")
+    elseif sub == "on" or sub == "unmute" then
+      cfg.alarmMuteUntil = nil
+      out.configChanged = true
+      say("siren on")
+    elseif sub == "test" then
+      out.alarmTest = true
+      say("siren test for 3 seconds")
+    elseif sub == "volume" then
+      local v = tonumber(w[3])
+      if not v or v < 0 or v > 3 then
+        say("usage: alarm volume <0-3>")
+        return out
+      end
+      cfg.alarmVolume = v
+      out.configChanged = true
+      say("siren volume " .. v)
+    else
+      say("usage: alarm | alarm mute [time] | alarm on | alarm test | alarm volume <0-3>")
+    end
 
   elseif cmd == "detectrange" then
     local n = tonumber(w[2])

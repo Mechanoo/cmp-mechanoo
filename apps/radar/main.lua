@@ -19,6 +19,7 @@ local D = require("lib.duration")
 local probe = require("lib.probe_core")
 local history = require("lib.history")
 local clock = require("lib.clock")
+local siren = require("lib.siren")
 
 local args = { ... }
 local AUTOSTART = "/startup/void_radar.lua"
@@ -60,7 +61,7 @@ local tr = tracker.new(cfg.tracker)
 local ps = policy.new(cfg.policy)
 local queue = alerts.queue()
 local logLines = {}
-local devices = { radars = {}, detectors = {}, chat = nil, speaker = nil }
+local devices = { radars = {}, detectors = {}, speakers = {}, audio = {} }
 local radarCenter
 local decisions = {}
 local level = nil
@@ -123,7 +124,7 @@ end
 
 ---------------------------------------------------------------- devices
 local function scan()
-  devices.radars, devices.detectors, devices.chat, devices.speaker = {}, {}, nil, nil
+  devices.radars, devices.detectors, devices.speakers, devices.audio = {}, {}, {}, {}
   for _, name in ipairs(peripheral.getNames()) do
     local methods = peripheral.getMethods(name) or {}
     local kind = probe.classify({ peripheral.getType(name) }, methods)
@@ -131,8 +132,10 @@ local function scan()
     for _, m in ipairs(methods) do has[m] = true end
     if kind == "radar" then devices.radars[#devices.radars + 1] = name
     elseif kind == "detector" then devices.detectors[#devices.detectors + 1] = name
-    elseif has.sendMessageToPlayer then devices.chat = name
-    elseif has.playSound then devices.speaker = name end
+    elseif has.playSound then
+      devices.speakers[#devices.speakers + 1] = name
+      devices.audio[name] = has.playAudio or nil
+    end
   end
   table.sort(devices.radars)
   -- average radar position = default zone centre
@@ -242,15 +245,19 @@ local function saveConfig()
   store.writeJson(CONFIG_FILE, cfg)
 end
 
-local function sound()
-  if devices.speaker then
-    pcall(peripheral.call, devices.speaker, "playSound", "minecraft:block.note_block.bell", 3, 1)
-  end
+local function volume()
+  return cfg.alarmVolume or 3
 end
 
-local function warnPlayer(name, text)
-  if devices.chat and name then
-    pcall(peripheral.call, devices.chat, "sendMessageToPlayer", text, name, "Void")
+local function muted()
+  return cfg.alarmMuteUntil ~= nil and now() < cfg.alarmMuteUntil
+end
+
+-- one bell for a new contact; the siren (alarmLoop) covers countdown and engage
+local function chime()
+  if muted() then return end
+  for _, spk in ipairs(devices.speakers) do
+    pcall(peripheral.call, spk, "playSound", "minecraft:block.bell.use", volume(), 1)
   end
 end
 
@@ -271,15 +278,7 @@ local function handle(ev)
   end
   local ch, game = alerts.push(queue, ev, alertCtx())
   if game then log((ch == "alerts" and "! " or "  ") .. game) end
-  local t = ev.target
-  if ev.type == "zone_enter" then
-    sound()
-    if t and t.kind == "player" then
-      warnPlayer(t.name, "You are in a no-go zone. Leave within " .. D.format(ev.countdownMs) .. " or you will be fired upon.")
-    end
-  elseif ev.type == "engage" or ev.type == "hostile" then
-    sound()
-  end
+  if ev.type == "detected" or ev.type == "hostile" then chime() end
 end
 
 local function applyAlarm()
@@ -396,6 +395,38 @@ local function serviceLoop()
   end
 end
 
+-- Siren: plays as long as a countdown runs ("wail") or something is engaged
+-- ("yelp"). Buffers are 1 s long and built once. "alarm mute" silences it.
+local alarmTestUntil = 0
+local buffers = {}
+local function alarmLoop()
+  local playing = false
+  while true do
+    local mode = (not muted()) and siren.modeFor(decisions) or nil
+    if not mode and now() < alarmTestUntil then mode = "wail" end
+    if mode and #devices.speakers > 0 then
+      buffers[mode] = buffers[mode] or siren.build(mode)
+      for _, spk in ipairs(devices.speakers) do
+        if devices.audio[spk] then
+          pcall(peripheral.call, spk, "playAudio", buffers[mode], volume())
+        else
+          pcall(peripheral.call, spk, "playSound", "minecraft:block.note_block.bell", volume(), mode == "yelp" and 2 or 1)
+        end
+      end
+      playing = true
+      sleep(0.9)
+    else
+      if playing then
+        for _, spk in ipairs(devices.speakers) do pcall(peripheral.call, spk, "stop") end
+        playing = false
+      end
+      if maxCycles and serviceDone then return end
+      sleep(0.5)
+    end
+    if maxCycles and serviceDone then return end
+  end
+end
+
 local function discordLoop()
   local cfgD = discord.config()
   local enabled = cfgD.alerts or cfgD.log
@@ -424,7 +455,9 @@ local function inputLoop()
     write("> ")
     local line = read()
     term.redirect(root)
-    local r = commands.run({ lists = ls, tracker = tr, config = cfg, now = now(), radarCenter = radarCenter, history = hist }, line)
+    local r = commands.run({ lists = ls, tracker = tr, config = cfg, now = now(), radarCenter = radarCenter, history = hist,
+      speakers = #devices.speakers }, line)
+    if r.alarmTest then alarmTestUntil = now() + 3000 end
     for _, l in ipairs(r.lines) do log(l) end
     for _, ev in ipairs(r.events) do alerts.push(queue, ev, alertCtx()) end
     if r.configChanged then saveConfig() end
@@ -467,9 +500,9 @@ if #devices.radars == 0 and #devices.detectors == 0 then log("No radar or detect
 log("Type 'help' for commands.")
 
 if headless then
-  parallel.waitForAll(serviceLoop, discordLoop)
+  parallel.waitForAll(serviceLoop, discordLoop, alarmLoop)
 else
   drawStatus()
-  parallel.waitForAny(serviceLoop, discordLoop, inputLoop)
+  parallel.waitForAny(serviceLoop, discordLoop, inputLoop, alarmLoop)
 end
 saveLists(true)
