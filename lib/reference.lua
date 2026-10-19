@@ -38,9 +38,21 @@ R.GROUPS = {
     { "basename <text>", "Name of the base in Discord messages." },
     { "timezone <hours>", "Shown times use this offset from UTC, e.g. timezone 2. Discord times follow each reader's clock." },
   } },
+  { title = "SHELL: void (outside the radar)", items = {
+    { "void list", "Installed apps." },
+    { "void update", "Update everything from GitHub (GitHub caches up to 5 minutes). Restart running apps afterwards." },
+    { "void version", "Installed version." },
+    { "void radar [tab]", "Start the radar. With tab it runs in its own tab (advanced computer) and the shell stays free." },
+    { "void radar autostart on|off", "Start the radar when the computer boots (in a tab if possible)." },
+    { "void music [tab]", "Music player on the same speakers. Q quits. The radar siren takes over the speakers and the music resumes afterwards." },
+    { "void music autostart on|off", "Open the music player in a tab on boot (advanced computer)." },
+    { "void discord-test", "Enter the Discord webhook URLs and send a test message." },
+    { "void probe [seconds] [--discord]", "Measure what radars and the player detector return; with --discord the report goes to the log channel." },
+  } },
   { title = "OTHER", items = {
     { "help [command]", "Short list, or the explanation of one command, e.g. help zone." },
     { "commands", "This full list. Keys: up/down or space to scroll, Q to close." },
+    { "commands discord", "Post this list to the Discord log channel (also done once automatically when the list changes after an update)." },
     { "exit", "Stop the radar and go back to the shell. Also: quit." },
   } },
 }
@@ -77,6 +89,26 @@ function R.render(width)
     end
   end
   return out
+end
+
+-- Discord version: one { title, description } per group, ASCII only.
+function R.embeds()
+  local out = {}
+  for _, g in ipairs(R.GROUPS) do
+    local lines = {}
+    for _, it in ipairs(g.items) do lines[#lines + 1] = "`" .. it[1] .. "`  " .. it[2] end
+    out[#out + 1] = { title = "COMMANDS: " .. g.title, description = table.concat(lines, "\n") }
+  end
+  return out
+end
+
+-- Changes whenever a command or explanation changes (for the one-time Discord post).
+function R.hash()
+  local h = 0
+  for _, e in ipairs(R.embeds()) do
+    for i = 1, #e.description do h = (h * 31 + e.description:byte(i)) % 2147483647 end
+  end
+  return tostring(h)
 end
 
 -- Entries whose usage starts with the given command word(s), for "help <command>".

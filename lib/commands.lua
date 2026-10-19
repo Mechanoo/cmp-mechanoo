@@ -121,7 +121,14 @@ function C.run(ctx, line)
     end
 
   elseif cmd == "commands" or cmd == "cmds" then
-    out.pager = true
+    if (w[2] or ""):lower() == "discord" then
+      for _, e in ipairs(reference.embeds()) do
+        out.events[#out.events + 1] = { type = "reference", title = e.title, text = e.description }
+      end
+      say("command list sent to the Discord log channel")
+    else
+      out.pager = true
+    end
 
   elseif cmd == "targets" or cmd == "t" then
     local all = tracker.all(ctx.tracker)

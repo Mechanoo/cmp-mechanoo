@@ -1,5 +1,5 @@
 {
- "version": "88e0abe70b",
+ "version": "5d7d202a5a",
  "files": [
   {
    "path": "apps/discord-test/main.lua",
@@ -15,7 +15,7 @@
   },
   {
    "path": "apps/radar/main.lua",
-   "size": 21497
+   "size": 21920
   },
   {
    "path": "bin/void.lua",
@@ -23,7 +23,7 @@
   },
   {
    "path": "lib/alerts.lua",
-   "size": 8514
+   "size": 8638
   },
   {
    "path": "lib/audiolock.lua",
@@ -35,7 +35,7 @@
   },
   {
    "path": "lib/commands.lua",
-   "size": 13571
+   "size": 13852
   },
   {
    "path": "lib/discord.lua",
@@ -63,7 +63,7 @@
   },
   {
    "path": "lib/reference.lua",
-   "size": 4427
+   "size": 6210
   },
   {
    "path": "lib/siren.lua",

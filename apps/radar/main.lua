@@ -574,6 +574,15 @@ for _ in pairs(ls.ships) do shipCount = shipCount + 1 end
 handle({ type = "online", text = ("Radar online on computer %d: %d radar(s), %d detector(s), zone %s. Lists: %d player(s), %d ship(s)."):format(
   os.getComputerID(), #devices.radars, #devices.detectors, cfg.zone and (cfg.zone.chunks .. "x" .. cfg.zone.chunks .. " chunks") or "not set",
   count, shipCount) })
+-- Post the command list to the Discord log once, and again whenever it changed
+-- (new commands after an update). "commands discord" posts it on demand.
+if not headless and cfg.referenceHash ~= reference.hash() then
+  for _, e in ipairs(reference.embeds()) do
+    alerts.push(queue, { type = "reference", title = e.title, text = e.description }, alertCtx())
+  end
+  cfg.referenceHash = reference.hash()
+  saveConfig()
+end
 if not cfg.zone then log("No zone yet: type 'zone center <x> <z>'") end
 if #devices.radars == 0 and #devices.detectors == 0 then log("No radar or detector found. Check the wired modems (red).") end
 log("Type 'help' for commands.")

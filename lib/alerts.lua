@@ -142,6 +142,10 @@ function A.format(ev, ctx)
       lines = { ev.text }
     end
     game = ev.text
+  elseif ty == "reference" then
+    ch, color, title = "log", A.COLOR.blue, ev.title
+    lines = { ev.text }
+    game = nil
   elseif ty == "online" then
     ch, color, title = "log", A.COLOR.green, "RADAR ONLINE"
     lines = { ev.text }

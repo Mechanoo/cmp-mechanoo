@@ -31,6 +31,27 @@ t.contains(out, "no command 'nonsense'", "help on an unknown command")
 out, r = run("commands")
 t.eq(r.pager, true, "commands asks the app for the full-screen list")
 
+out, r = run("commands discord")
+t.contains(out, "Discord log channel", "commands discord confirms")
+t.eq(r.pager, nil, "commands discord does not open the pager")
+t.truthy(#r.events >= 7, "one event per group")
+local alerts = require("lib.alerts")
+local sizeOk, hasVoid, hasRadar = true, false, false
+for _, ev in ipairs(r.events) do
+  local ch, embed, game = alerts.format(ev, { now = now })
+  t.eq(ch, "log", "reference goes to the log channel")
+  t.eq(game, nil, "no line in the radar screen log")
+  if #embed.description > 4000 or #embed.title > 256 then sizeOk = false end
+  if embed.title:find("SHELL: void", 1, true) and embed.description:find("`void update`", 1, true) then hasVoid = true end
+  if embed.title:find("ALARM", 1, true) and embed.description:find("`alarm test`", 1, true) then hasRadar = true end
+  t.eq(embed.description:find("[\128-\255]"), nil, "ASCII only: " .. embed.title)
+end
+t.truthy(sizeOk, "embeds fit the Discord limits")
+t.truthy(hasVoid, "void shell commands are in the Discord post")
+t.truthy(hasRadar, "radar commands are in the Discord post")
+local ref = require("lib.reference")
+t.eq(ref.hash(), ref.hash(), "hash is stable")
+
 local reference = require("lib.reference")
 local rendered = reference.render(26)
 local function shown(cmd)
