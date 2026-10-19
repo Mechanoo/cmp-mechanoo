@@ -72,8 +72,13 @@ peripheral = {
       return names
     end
     if m == "getPlayer" then
-      for _, p in ipairs(players()) do if p.name == a[1] then return p end end
-      if a[1] == "u-ghost" then return { name = "Ghost", uuid = "u-ghost", x = 150, y = 64, z = 150 } end
+      -- like the real Player Detector: "name" is the entity type, the player name is "displayName"
+      for _, p in ipairs(players()) do
+        if p.name == a[1] or p.uuid == a[1] then
+          return { name = "minecraft:player", displayName = p.name, uuid = p.uuid, x = p.x, y = p.y, z = p.z }
+        end
+      end
+      if a[1] == "u-ghost" then return { name = "minecraft:player", displayName = "Ghost", uuid = "u-ghost", x = 150, y = 64, z = 150 } end
     end
     if m == "sendMessageToPlayer" then chatCalls[#chatCalls + 1] = { msg = a[1], to = a[2] } return true end
     if m == "playSound" then soundCalls = soundCalls + 1 return true end
@@ -102,6 +107,7 @@ t.contains(L, "Radar online on computer 7: 2 radar(s), 1 detector(s), zone 10x10
 t.contains(A, "**Stranger** (unknown player) detected", "stranger detected")
 t.contains(A, "**Ghost** (unknown player) detected", "name of a radar-only player looked up by uuid")
 t.eq(A:find("name not known", 1, true), nil, "every player got a name")
+t.eq(A:find("minecraft:player", 1, true), nil, "the entity type is never used as a name")
 t.contains(A, "NO-GO ZONE", "stranger entered the zone")
 t.eq(A:find("within 128 blocks", 1, true), nil, "no ring alert when jumping straight into the zone")
 t.contains(A, "**ENGAGE** **Stranger** (unknown player)", "engaged after the countdown")

@@ -32,3 +32,8 @@ Peripheral names and quirks found in the world. Add output of `peripherals` here
 - A third SABLE id was seen in every sample by exactly one radar and never moved (a leftover test object).
 - Gaps: moving targets near the radar cluster had gaps up to 9 s; the stationary object had none. Target hold time should be at least ~10 s.
 - CC:Sable on a computer ON a ship: `sublevel.getUniqueId()`, `getName()`, `setName()`, poses and velocity. A ship computer can read its own current id.
+
+## Player Detector getPlayer() (measured in game, radar app)
+- `getPlayer(name or uuid)` returns the ENTITY TYPE in `name` ("minecraft:player"), not the player name.
+- The player name comes from the list of `getPlayersInRange` (strings) or from `displayName` (from the AP LuaConverter).
+- `getPlayer` also accepts a UUID, so a radar-only PLAYER track can be resolved to a name.

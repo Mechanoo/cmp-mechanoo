@@ -51,6 +51,7 @@ for _, name in ipairs(radars) do
 end
 
 -- 2. sampling
+local rawGetPlayer
 local function readPlayers(det)
   local ok, list = pcall(peripheral.call, det, "getPlayersInRange", 512)
   if not ok or type(list) ~= "table" then return {} end
@@ -58,6 +59,7 @@ local function readPlayers(det)
   for _, e in ipairs(list) do
     local name = type(e) == "table" and e.name or e
     local info = (type(e) == "table" and e.x) and e or select(2, pcall(peripheral.call, det, "getPlayer", name))
+    if type(info) == "table" and not rawGetPlayer then rawGetPlayer = info end
     if type(info) == "table" and info.x then
       players[#players + 1] = { name = tostring(name), uuid = info.uuid, x = info.x, y = info.y, z = info.z }
     end
@@ -96,6 +98,14 @@ if not ok then print("Stopped: " .. tostring(err)) end
 out("")
 out("Report:")
 for _, line in ipairs(core.summarize(stats)) do out(line) end
+if rawGetPlayer then
+  local keys = {}
+  for k, v in pairs(rawGetPlayer) do
+    if type(v) ~= "table" then keys[#keys + 1] = k .. "=" .. tostring(v) end
+  end
+  table.sort(keys)
+  out("raw getPlayer: " .. table.concat(keys, " "))
+end
 store.writeText("probe-report.txt", table.concat(report, "\n"))
 print("Saved to /void-data/probe-report.txt")
 

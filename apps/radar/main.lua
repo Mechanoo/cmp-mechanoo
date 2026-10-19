@@ -51,6 +51,10 @@ cfg.visitorDefaultMs = cfg.visitorDefaultMs or 30 * 60000
 cfg.intervalS = cfg.intervalS or 1
 local ls = lists.new(store.readJson(LISTS_FILE, nil))
 local hist = history.new(store.readJson(HISTORY_FILE, nil))
+-- versions before this fix recorded the entity type "minecraft:player" as a name
+for k in pairs(hist.players) do
+  if k:find(":", 1, true) then hist.players[k] = nil end
+end
 local tr = tracker.new(cfg.tracker)
 local ps = policy.new(cfg.policy)
 local queue = alerts.queue()
@@ -119,19 +123,39 @@ local function scan()
   radarCenter = n > 0 and { x = sx / n, y = 0, z = sz / n } or nil
 end
 
+-- getPlayer() puts the ENTITY TYPE into "name" ("minecraft:player", measured in
+-- game); the player's name is in the list of getPlayersInRange and in "displayName".
+local function validName(n)
+  return type(n) == "string" and n:match("^[%w_]+$") ~= nil and #n <= 16
+end
+
+local function pickName(info, fromList)
+  if validName(fromList) then return fromList end
+  if type(info) == "table" then
+    for _, k in ipairs({ "username", "playerName", "displayName", "name" }) do
+      if validName(info[k]) then return info[k] end
+    end
+  end
+  return nil
+end
+
 local function readDetector(det)
   local ok, list = pcall(peripheral.call, det, "getPlayersInRange", cfg.detectRange or 512)
   if not ok or type(list) ~= "table" then return {} end
   local players, tasks = {}, {}
   for _, e in ipairs(list) do
-    if type(e) == "table" and e.x and e.name then
-      players[#players + 1] = { name = e.name, uuid = e.uuid, x = e.x, y = e.y, z = e.z }
+    local listed = type(e) == "string" and e or nil
+    if type(e) == "table" and e.x and pickName(e) then
+      players[#players + 1] = { name = pickName(e), uuid = e.uuid, x = e.x, y = e.y, z = e.z }
     else
-      local name = type(e) == "table" and e.name or e
-      tasks[#tasks + 1] = function()
-        local ok2, info = pcall(peripheral.call, det, "getPlayer", name)
-        if ok2 and type(info) == "table" and info.x then
-          players[#players + 1] = { name = tostring(info.name or name), uuid = info.uuid, x = info.x, y = info.y, z = info.z }
+      local query = listed or pickName(e)
+      if query then
+        tasks[#tasks + 1] = function()
+          local ok2, info = pcall(peripheral.call, det, "getPlayer", query)
+          local name = pickName(info, listed)
+          if ok2 and type(info) == "table" and info.x and name then
+            players[#players + 1] = { name = name, uuid = info.uuid, x = info.x, y = info.y, z = info.z }
+          end
         end
       end
     end
@@ -170,8 +194,9 @@ local function sample()
         known[id] = true
         ask[#ask + 1] = function()
           local ok, info = pcall(peripheral.call, det, "getPlayer", id)
-          if ok and type(info) == "table" and info.x and info.name then
-            players[#players + 1] = { name = tostring(info.name), uuid = id, x = info.x, y = info.y, z = info.z }
+          local name = pickName(info)
+          if ok and type(info) == "table" and info.x and name then
+            players[#players + 1] = { name = name, uuid = id, x = info.x, y = info.y, z = info.z }
           end
         end
       end
