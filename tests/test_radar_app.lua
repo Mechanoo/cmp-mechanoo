@@ -34,6 +34,7 @@ local function players()
   local s = sec()
   p[#p + 1] = { name = "Stranger", uuid = "u-str", x = s < 2 and 300 or 40, y = 64, z = 0 }
   if s >= 4 then p[#p + 1] = { name = "Enemy", uuid = "u-en", x = 400, y = 64, z = 0 } end
+  if s < 3 then p[#p + 1] = { name = "Passerby", uuid = "u-pb", x = 200, y = 64, z = 200 } end
   return p
 end
 local function tracks()
@@ -87,7 +88,7 @@ http = {
 }
 
 local fn = assert(loadfile("/work/apps/radar/main.lua", "t", _ENV))
-fn("--cycles", "16")
+fn("--cycles", "80")
 
 local alertsText, logText = {}, {}
 for _, p in ipairs(posts) do
@@ -117,6 +118,10 @@ local saved = textutils.unserialiseJSON(readAll("/void-data/lists.json"))
 t.eq(saved.ships["s-new"] and saved.ships["s-new"].list, "trusted", "takeover saved")
 t.eq(saved.ships["s-new"] and saved.ships["s-new"].label, "Home", "label saved")
 t.eq(saved.players.mechanoo.uuid, "u-me", "uuid remembered")
+t.contains(L, "Visit of player **Passerby** (unknown) ended", "visit summary in the log")
+t.contains(L, "Visits so far: 1", "visit count in the log")
+local hist = textutils.unserialiseJSON(readAll("/void-data/history.json"))
+t.eq(hist.players.passerby and hist.players.passerby.visits, 1, "history saved")
 local rcfg = textutils.unserialiseJSON(readAll("/void-data/radar.json"))
 t.eq(rcfg.zone and rcfg.zone.x1, -80, "zone created around the radars")
 

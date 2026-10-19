@@ -1,13 +1,18 @@
--- Decides what to do about every target.
+-- Decides what to do about every target and keeps track of visits.
 --
 --   trusted / visitor  -> "friendly"
 --   hostile            -> "engage" as soon as it is seen, anywhere
---   unknown, outside   -> "watch"   (alerts when first seen and when it crosses a ring)
+--   unknown, outside   -> "watch"   (alerts when a visit starts and when it crosses a ring)
 --   unknown, in zone   -> "warn" for countdownMs, then "engage"
 --   other (shells ...) -> "ignore"
 --
 -- Escort rule: an unknown ship with a trusted or visitor player within
 -- escortDist is treated as friendly (a friend flying an unlisted ship).
+--
+-- Visits: a visit starts when a player or ship shows up and ends when it has
+-- been gone for visitGapMs. Shorter gaps (radar flicker, edge of range) belong
+-- to the same visit. Every visit is announced; its end is reported with a
+-- summary ("visit_end").
 local V = require("lib.vec")
 local Z = require("lib.zone")
 local tracker = require("lib.tracker")
@@ -18,7 +23,7 @@ P.DEFAULTS = {
   countdownMs = 10000,
   rings = { 256, 128 },
   escortDist = 8,
-  quietMs = 300000, -- a target that comes back within this time is not announced again
+  visitGapMs = 60000,
 }
 
 function P.new(cfg)
@@ -32,12 +37,8 @@ function P.new(cfg)
   return { cfg = c, per = {} }
 end
 
-function P.forget(ps, id)
-  ps.per[id] = nil
-end
-
--- The tracker lost a target. Its zone countdown stops, but we remember that it
--- was announced, so a target that flickers in and out is not reported again.
+-- The tracker lost a target. The zone countdown stops; the visit stays open
+-- for visitGapMs in case the target comes back.
 function P.lost(ps, id, now)
   local st = ps.per[id]
   if st then
@@ -53,6 +54,24 @@ local function snapshot(t, cls, zone)
   }
 end
 
+local function visitEnd(id, st)
+  return {
+    type = "visit_end",
+    target = { id = id, kind = st.kind, name = st.name, cls = st.cls },
+    start = st.visitStart, stop = st.lastSeenAt, closest = st.closest, enteredZone = st.enteredZone,
+  }
+end
+
+-- Ends every open visit (for example when the service stops).
+function P.closeAll(ps)
+  local events = {}
+  for id, st in pairs(ps.per) do
+    if st.kind ~= "other" then events[#events + 1] = visitEnd(id, st) end
+  end
+  ps.per = {}
+  return events
+end
+
 -- targets: tracker targets; ls: lists; zone may be nil.
 -- Returns decisions (id -> { action, cls, remainingMs }) and events.
 function P.update(ps, now, targets, ls, zone)
@@ -60,7 +79,10 @@ function P.update(ps, now, targets, ls, zone)
   local decisions, events = {}, {}
 
   for id, st in pairs(ps.per) do
-    if st.lostAt and now - st.lostAt > cfg.quietMs then ps.per[id] = nil end
+    if st.lostAt and now - st.lostAt > cfg.visitGapMs then
+      if st.kind ~= "other" then events[#events + 1] = visitEnd(id, st) end
+      ps.per[id] = nil
+    end
   end
 
   local friends = {}
@@ -75,10 +97,17 @@ function P.update(ps, now, targets, ls, zone)
     local cls = classes[t.id]
     local st = ps.per[t.id]
     if not st then
-      st = { rings = {} }
+      st = { rings = {}, visitStart = now, enteredZone = false }
       ps.per[t.id] = st
     end
+    local inside = Z.contains(zone, t.pos)
+    local dist = zone and Z.distance(zone, t.pos) or nil
     st.lostAt = nil
+    st.lastSeenAt = now
+    st.kind, st.cls = t.kind, cls
+    st.name = t.name or st.name
+    if dist and (not st.closest or dist < st.closest) then st.closest = dist end
+    if inside then st.enteredZone = true end
 
     local escorted = false
     if t.kind == "ship" and cls == "unknown" then
@@ -111,12 +140,10 @@ function P.update(ps, now, targets, ls, zone)
         emit("detected")
         st.detected = true
       end
-      local inside = Z.contains(zone, t.pos)
-      if zone then
+      if dist then
         -- rings are only announced outside the zone; inside, the zone alert says enough
-        local d = Z.distance(zone, t.pos)
         for _, r in ipairs(cfg.rings) do
-          if d <= r and not st.rings[r] then
+          if dist <= r and not st.rings[r] then
             st.rings[r] = true
             if not inside then emit("approach", { ring = r }) end
           end

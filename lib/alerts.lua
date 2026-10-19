@@ -55,6 +55,15 @@ function A.format(ev)
   elseif ty == "takeover_ambiguous" then
     return "alerts", "New ship `" .. tracker.short(ev.id) .. "` appeared next to " .. shipName(ev.near, ev.label)
       .. ", but more than one ship could be the reassembled one. No takeover; list it by hand."
+  elseif ty == "visit_end" then
+    if not t or t.kind == "other" or t.cls == "trusted" then return nil end
+    local start, stop = math.floor(ev.start / 1000), math.floor(ev.stop / 1000)
+    local s = "Visit of " .. who(t) .. " (" .. tostring(t.cls) .. ") ended: <t:" .. start .. ":t> to <t:" .. stop
+      .. ":t>, " .. D.format(ev.stop - ev.start)
+    if ev.closest then s = s .. ", closest " .. math.floor(ev.closest + 0.5) .. " blocks" end
+    if ev.enteredZone then s = s .. ", was in the no-go zone" end
+    if ev.visits then s = s .. ". Visits so far: " .. ev.visits end
+    return "log", s .. "."
   elseif ty == "list_change" then
     return "log", ev.text .. "."
   elseif ty == "online" then

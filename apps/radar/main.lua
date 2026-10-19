@@ -17,6 +17,7 @@ local alerts = require("lib.alerts")
 local Z = require("lib.zone")
 local D = require("lib.duration")
 local probe = require("lib.probe_core")
+local history = require("lib.history")
 
 local args = { ... }
 local AUTOSTART = "/startup/void_radar.lua"
@@ -44,11 +45,12 @@ end
 local headless = maxCycles ~= nil
 
 ---------------------------------------------------------------- state
-local CONFIG_FILE, LISTS_FILE = "radar.json", "lists.json"
+local CONFIG_FILE, LISTS_FILE, HISTORY_FILE = "radar.json", "lists.json", "history.json"
 local cfg = store.readJson(CONFIG_FILE, {})
 cfg.visitorDefaultMs = cfg.visitorDefaultMs or 30 * 60000
 cfg.intervalS = cfg.intervalS or 1
 local ls = lists.new(store.readJson(LISTS_FILE, nil))
+local hist = history.new(store.readJson(HISTORY_FILE, nil))
 local tr = tracker.new(cfg.tracker)
 local ps = policy.new(cfg.policy)
 local queue = alerts.queue()
@@ -183,6 +185,11 @@ local function warnPlayer(name, text)
 end
 
 local function handle(ev)
+  if ev.type == "visit_end" and history.record(hist, ev) then
+    ev.visits = history.get(hist, ev.target.name).visits
+    store.writeJson(HISTORY_FILE, history.data(hist))
+    hist.dirty = false
+  end
   local ch = alerts.push(queue, ev)
   local _, text = alerts.format(ev)
   if text then log((ch == "alerts" and "! " or "  ") .. text:gsub("%*%*", ""):gsub("`", "")) end
@@ -332,7 +339,7 @@ local function inputLoop()
     write("> ")
     local line = read()
     term.redirect(root)
-    local r = commands.run({ lists = ls, tracker = tr, config = cfg, now = now(), radarCenter = radarCenter }, line)
+    local r = commands.run({ lists = ls, tracker = tr, config = cfg, now = now(), radarCenter = radarCenter, history = hist }, line)
     for _, l in ipairs(r.lines) do log(l) end
     for _, ev in ipairs(r.events) do alerts.push(queue, ev) end
     if r.configChanged then saveConfig() end

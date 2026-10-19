@@ -4,6 +4,7 @@
 -- ctx = {
 --   lists, tracker, config (zone, visitorDefaultMs), now,
 --   radarCenter = {x,y,z} or nil,   -- average radar position, for "zone radars"
+--   history,                          -- visit history (lib.history), optional
 -- }
 -- Returns { lines = {...}, events = {...}, configChanged = bool }
 local lists = require("lib.lists")
@@ -11,6 +12,7 @@ local tracker = require("lib.tracker")
 local Z = require("lib.zone")
 local D = require("lib.duration")
 local V = require("lib.vec")
+local history = require("lib.history")
 
 local C = {}
 
@@ -26,6 +28,8 @@ C.HELP = {
   "zone               show the no-go zone",
   "zone center <x> <z> [chunks]",
   "zone radars [chunks]   centre on the radars",
+  "history [name]     how often and when players were here",
+  "timezone <hours>   e.g. timezone 2 for UTC+2",
 }
 
 local function words(line)
@@ -238,6 +242,26 @@ function C.run(ctx, line)
     else
       say("usage: zone | zone center <x> <z> [chunks] | zone radars [chunks]")
     end
+
+  elseif cmd == "history" then
+    if not ctx.history then
+      say("no history available")
+      return out
+    end
+    local off = cfg.timeOffsetHours or 0
+    say("times in " .. (off == 0 and "UTC" or ("UTC" .. (off > 0 and "+" or "") .. off)))
+    local lines = w[2] and history.details(ctx.history, w[2], off) or history.summary(ctx.history, off, 30)
+    for _, l in ipairs(lines) do say(l) end
+
+  elseif cmd == "timezone" then
+    local n = tonumber(w[2])
+    if not n or n < -12 or n > 14 then
+      say("usage: timezone <hours from UTC>, e.g. timezone 2")
+      return out
+    end
+    cfg.timeOffsetHours = n
+    out.configChanged = true
+    say("times are now shown in UTC" .. (n >= 0 and "+" or "") .. n)
 
   else
     say("unknown command '" .. cmd .. "', type help")
