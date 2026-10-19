@@ -2,8 +2,8 @@
 -- Channels: "alerts" (needs attention) and "log" (record).
 -- Text is ASCII only, so the JSON encoding in CC cannot garble anything.
 --
--- ctx = { now = ms, baseName = "Void base", tz = hours from UTC or nil,
---         level = { n = 3, label = "ELEVATED" } or nil }
+-- ctx = { now = ms, baseName = "Void base", level = { n = 3, label = "ELEVATED" } or nil }
+-- Times are Discord timestamps only: Discord shows them in each reader's own zone.
 local V = require("lib.vec")
 local D = require("lib.duration")
 local C = require("lib.clock")
@@ -32,12 +32,8 @@ local function kindWord(t)
   return (t and t.kind == "ship") and "ship" or "player"
 end
 
--- "<t:..:t> (16:02 UTC+2)" - Discord shows the first part in the reader's zone,
--- the second part is the zone set with the "timezone" command.
-local function at(ms, ctx)
-  local s = C.discord(ms, "t")
-  if ctx.tz then s = s .. " (" .. C.hm(ms, ctx.tz) .. " " .. C.tzName(ctx.tz) .. ")" end
-  return s
+local function at(ms)
+  return C.discord(ms, "t")
 end
 
 local function position(t)

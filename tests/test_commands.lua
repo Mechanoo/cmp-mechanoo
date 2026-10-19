@@ -109,7 +109,7 @@ out = run("nonsense")
 t.contains(out, "unknown command", "unknown command")
 
 ---------------------------------------------------------------- alerts
-local actx = { now = 1760882520000, baseName = "Void base", tz = 2, level = { n = 4, label = "HIGH" } }
+local actx = { now = 1760882520000, baseName = "Void base", level = { n = 4, label = "HIGH" } }
 local q = alerts.queue()
 local ch, game = alerts.push(q, { type = "zone_enter", countdownMs = 10000,
   target = { id = "u", kind = "player", name = "Steve", cls = "unknown", pos = { x = 1.4, y = 64, z = -2.6 }, dist = 3.2 } }, actx)
@@ -124,7 +124,8 @@ t.eq(msgs[1][1], "alerts", "alerts first")
 t.eq(e.title, "NO-GO ZONE: Steve", "title")
 t.eq(e.color, alerts.COLOR.orange, "orange")
 t.contains(e.description, "`1, 64, -3`", "rounded position")
-t.contains(e.description, "<t:1760882520:t> (16:02 UTC+2)", "time in Discord and in UTC+2")
+t.contains(e.description, "at <t:1760882520:t>", "Discord time")
+t.eq(e.description:find("UTC", 1, true), nil, "only Discord timestamps, no zone text")
 t.contains(e.description, "<t:1760882530:R>", "live countdown to firing")
 t.contains(e.description, "Base level: **4 HIGH**", "base level")
 t.contains(e.description, "`trust Steve`", "command hint")
@@ -138,7 +139,8 @@ t.eq(#alerts.drain(q), 0, "queue empty after drain")
 local _, ve = alerts.format({ type = "list_change", text = "Bob is a visitor", who = "Bob", list = "visitor",
   expires = actx.now + 45 * 60000 }, actx)
 t.eq(ve.title, "VISITOR: Bob", "visitor title")
-t.contains(ve.description, "16:47 UTC+2", "until time")
+t.contains(ve.description, "until <t:" .. math.floor((actx.now + 45 * 60000) / 1000) .. ":t>", "until time")
+t.eq(ve.description:find("UTC", 1, true), nil, "no zone text")
 t.contains(ve.description, "<t:" .. math.floor((actx.now + 45 * 60000) / 1000) .. ":R>", "live countdown")
 
 -- without a timezone only the Discord time

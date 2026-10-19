@@ -1,5 +1,5 @@
 {
- "version": "ca99def408",
+ "version": "432116ba0a",
  "files": [
   {
    "path": "apps/discord-test/main.lua",
@@ -11,7 +11,7 @@
   },
   {
    "path": "apps/radar/main.lua",
-   "size": 16765
+   "size": 16739
   },
   {
    "path": "bin/void.lua",
@@ -19,7 +19,7 @@
   },
   {
    "path": "lib/alerts.lua",
-   "size": 8722
+   "size": 8514
   },
   {
    "path": "lib/clock.lua",

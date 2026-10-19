@@ -255,7 +255,7 @@ local function warnPlayer(name, text)
 end
 
 local function alertCtx()
-  return { now = now(), baseName = cfg.baseName, tz = cfg.timeOffsetHours, level = level }
+  return { now = now(), baseName = cfg.baseName, level = level }
 end
 
 local function handle(ev)
