@@ -7,10 +7,15 @@ local tracker = require("lib.tracker")
 
 local A = {}
 
+-- "**Steve** (unknown player)", "ship `8c98841d` (hostile)"
 local function who(t)
   if not t then return "?" end
-  if t.kind == "player" then return "player **" .. (t.name or tracker.short(t.id)) .. "**" end
-  if t.kind == "ship" then return "ship `" .. tracker.short(t.id) .. "`" end
+  local cls = t.cls and (t.cls .. " ") or ""
+  if t.kind == "player" then
+    if t.name then return "**" .. t.name .. "** (" .. cls .. "player)" end
+    return "player `" .. tracker.short(t.id) .. "` (" .. cls .. "player, name not known)"
+  end
+  if t.kind == "ship" then return "ship `" .. tracker.short(t.id) .. "` (" .. (t.cls or "?") .. ")" end
   return tostring(t.kind) .. " `" .. tracker.short(t.id) .. "`"
 end
 
@@ -30,18 +35,18 @@ function A.format(ev)
   local t = ev.target
   local ty = ev.type
   if ty == "detected" then
-    return "alerts", "Unknown " .. who(t) .. " detected" .. where(t) .. "."
+    return "alerts", who(t) .. " detected" .. where(t) .. "."
   elseif ty == "approach" then
-    return "alerts", "Unknown " .. who(t) .. " is within " .. ev.ring .. " blocks of the base" .. where(t) .. "."
+    return "alerts", who(t) .. " is within " .. ev.ring .. " blocks of the base" .. where(t) .. "."
   elseif ty == "zone_enter" then
-    return "alerts", "**NO-GO ZONE**: unknown " .. who(t) .. " entered" .. where(t)
+    return "alerts", "**NO-GO ZONE**: " .. who(t) .. " entered" .. where(t)
       .. ". Engaging in " .. D.format(ev.countdownMs) .. " unless marked trusted or visitor."
   elseif ty == "zone_leave" then
-    return "alerts", "Unknown " .. who(t) .. " left the no-go zone."
+    return "alerts", who(t) .. " left the no-go zone."
   elseif ty == "zone_cleared" then
-    return "log", who(t) .. " is " .. tostring(t.cls) .. " now, countdown stopped."
+    return "log", who(t) .. ": countdown stopped."
   elseif ty == "engage" then
-    return "alerts", "**ENGAGE** unknown " .. who(t) .. where(t) .. "."
+    return "alerts", "**ENGAGE** " .. who(t) .. where(t) .. "."
   elseif ty == "hostile" then
     return "alerts", "**HOSTILE** " .. who(t) .. " detected" .. where(t) .. ". Engage."
   elseif ty == "visitor_expired" then
@@ -58,7 +63,7 @@ function A.format(ev)
   elseif ty == "visit_end" then
     if not t or t.kind == "other" or t.cls == "trusted" then return nil end
     local start, stop = math.floor(ev.start / 1000), math.floor(ev.stop / 1000)
-    local s = "Visit of " .. who(t) .. " (" .. tostring(t.cls) .. ") ended: <t:" .. start .. ":t> to <t:" .. stop
+    local s = "Visit of " .. who(t) .. " ended: <t:" .. start .. ":t> to <t:" .. stop
       .. ":t>, " .. D.format(ev.stop - ev.start)
     if ev.closest then s = s .. ", closest " .. math.floor(ev.closest + 0.5) .. " blocks" end
     if ev.enteredZone then s = s .. ", was in the no-go zone" end

@@ -1,5 +1,5 @@
 {
- "version": "97ffdf60de",
+ "version": "9f19b4e806",
  "files": [
   {
    "path": "apps/discord-test/main.lua",
@@ -11,7 +11,7 @@
   },
   {
    "path": "apps/radar/main.lua",
-   "size": 13589
+   "size": 14508
   },
   {
    "path": "bin/void.lua",
@@ -19,7 +19,7 @@
   },
   {
    "path": "lib/alerts.lua",
-   "size": 4301
+   "size": 4420
   },
   {
    "path": "lib/commands.lua",

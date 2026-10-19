@@ -45,6 +45,7 @@ local function tracks()
   elseif s >= 7 then
     list[#list + 1] = { id = "s-new", category = "SABLE", entityType = "Sable:ship", position = { x = 12, y = 70, z = 10 }, velocity = { x = 0, y = 0, z = 0 } }
   end
+  list[#list + 1] = { id = "u-ghost", category = "PLAYER", entityType = "entity.minecraft.player", position = { x = 150, y = 64, z = 150 }, velocity = { x = 0, y = 0, z = 0 } }
   return list
 end
 
@@ -72,6 +73,7 @@ peripheral = {
     end
     if m == "getPlayer" then
       for _, p in ipairs(players()) do if p.name == a[1] then return p end end
+      if a[1] == "u-ghost" then return { name = "Ghost", uuid = "u-ghost", x = 150, y = 64, z = 150 } end
     end
     if m == "sendMessageToPlayer" then chatCalls[#chatCalls + 1] = { msg = a[1], to = a[2] } return true end
     if m == "playSound" then soundCalls = soundCalls + 1 return true end
@@ -97,11 +99,13 @@ end
 local A, L = table.concat(alertsText, "\n"), table.concat(logText, "\n")
 
 t.contains(L, "Radar online on computer 7: 2 radar(s), 1 detector(s), zone 10x10 chunks", "online message")
-t.contains(A, "Unknown player **Stranger** detected", "stranger detected")
+t.contains(A, "**Stranger** (unknown player) detected", "stranger detected")
+t.contains(A, "**Ghost** (unknown player) detected", "name of a radar-only player looked up by uuid")
+t.eq(A:find("name not known", 1, true), nil, "every player got a name")
 t.contains(A, "NO-GO ZONE", "stranger entered the zone")
 t.eq(A:find("within 128 blocks", 1, true), nil, "no ring alert when jumping straight into the zone")
-t.contains(A, "**ENGAGE** unknown player **Stranger**", "engaged after the countdown")
-t.contains(A, "**HOSTILE** player **Enemy**", "hostile reported")
+t.contains(A, "**ENGAGE** **Stranger** (unknown player)", "engaged after the countdown")
+t.contains(A, "**HOSTILE** **Enemy** (hostile player)", "hostile reported")
 t.eq(A:find("Mechanoo", 1, true), nil, "trusted owner never reported")
 t.contains(L, "took over the list 'trusted'", "ship takeover logged")
 t.eq(A:find("ship `s-new`", 1, true), nil, "reassembled ship is not an alert")
@@ -118,7 +122,7 @@ local saved = textutils.unserialiseJSON(readAll("/void-data/lists.json"))
 t.eq(saved.ships["s-new"] and saved.ships["s-new"].list, "trusted", "takeover saved")
 t.eq(saved.ships["s-new"] and saved.ships["s-new"].label, "Home", "label saved")
 t.eq(saved.players.mechanoo.uuid, "u-me", "uuid remembered")
-t.contains(L, "Visit of player **Passerby** (unknown) ended", "visit summary in the log")
+t.contains(L, "Visit of **Passerby** (unknown player) ended", "visit summary in the log")
 t.contains(L, "Visits so far: 1", "visit count in the log")
 t.contains(L, "<t:1000:t> to <t:1002:t>, 2s,", "visit length without the hold time")
 local hist = textutils.unserialiseJSON(readAll("/void-data/history.json"))

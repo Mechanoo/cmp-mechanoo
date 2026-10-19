@@ -156,6 +156,28 @@ local function sample()
     end
   end
   if #tasks > 0 then parallel.waitForAll(table.unpack(tasks)) end
+
+  -- A player the radar sees but getPlayersInRange did not list: the detector
+  -- also accepts a UUID, so ask it for the name (at most 5 per cycle).
+  local det = devices.detectors[1]
+  if det then
+    local known = {}
+    for _, p in ipairs(players) do if p.uuid then known[tostring(p.uuid)] = true end end
+    local ask = {}
+    for _, tk in ipairs(tracks) do
+      local id = tostring(tk.id)
+      if tk.category == "PLAYER" and not known[id] and not tr.names[id] and #ask < 5 then
+        known[id] = true
+        ask[#ask + 1] = function()
+          local ok, info = pcall(peripheral.call, det, "getPlayer", id)
+          if ok and type(info) == "table" and info.x and info.name then
+            players[#players + 1] = { name = tostring(info.name), uuid = id, x = info.x, y = info.y, z = info.z }
+          end
+        end
+      end
+    end
+    if #ask > 0 then parallel.waitForAll(table.unpack(ask)) end
+  end
   return tracks, players
 end
 
