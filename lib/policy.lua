@@ -1,0 +1,150 @@
+-- Decides what to do about every target.
+--
+--   trusted / visitor  -> "friendly"
+--   hostile            -> "engage" as soon as it is seen, anywhere
+--   unknown, outside   -> "watch"   (alerts when first seen and when it crosses a ring)
+--   unknown, in zone   -> "warn" for countdownMs, then "engage"
+--   other (shells ...) -> "ignore"
+--
+-- Escort rule: an unknown ship with a trusted or visitor player within
+-- escortDist is treated as friendly (a friend flying an unlisted ship).
+local V = require("lib.vec")
+local Z = require("lib.zone")
+local tracker = require("lib.tracker")
+
+local P = {}
+
+P.DEFAULTS = {
+  countdownMs = 10000,
+  rings = { 256, 128 },
+  escortDist = 8,
+  quietMs = 300000, -- a target that comes back within this time is not announced again
+}
+
+function P.new(cfg)
+  local c = {}
+  for k, v in pairs(P.DEFAULTS) do c[k] = v end
+  for k, v in pairs(cfg or {}) do c[k] = v end
+  local rings = {}
+  for i, r in ipairs(c.rings) do rings[i] = r end
+  table.sort(rings, function(a, b) return a > b end)
+  c.rings = rings
+  return { cfg = c, per = {} }
+end
+
+function P.forget(ps, id)
+  ps.per[id] = nil
+end
+
+-- The tracker lost a target. Its zone countdown stops, but we remember that it
+-- was announced, so a target that flickers in and out is not reported again.
+function P.lost(ps, id, now)
+  local st = ps.per[id]
+  if st then
+    st.lostAt = now
+    st.zoneSince, st.engaged = nil, false
+  end
+end
+
+local function snapshot(t, cls, zone)
+  return {
+    id = t.id, kind = t.kind, name = t.name, cls = cls,
+    pos = V.copy(t.pos), dist = zone and Z.distance(zone, t.pos) or nil,
+  }
+end
+
+-- targets: tracker targets; ls: lists; zone may be nil.
+-- Returns decisions (id -> { action, cls, remainingMs }) and events.
+function P.update(ps, now, targets, ls, zone)
+  local cfg = ps.cfg
+  local decisions, events = {}, {}
+
+  for id, st in pairs(ps.per) do
+    if st.lostAt and now - st.lostAt > cfg.quietMs then ps.per[id] = nil end
+  end
+
+  local friends = {}
+  local classes = {}
+  for _, t in ipairs(targets) do
+    local cls = tracker.classify(t, ls)
+    classes[t.id] = cls
+    if t.kind == "player" and (cls == "trusted" or cls == "visitor") then friends[#friends + 1] = t end
+  end
+
+  for _, t in ipairs(targets) do
+    local cls = classes[t.id]
+    local st = ps.per[t.id]
+    if not st then
+      st = { rings = {} }
+      ps.per[t.id] = st
+    end
+    st.lostAt = nil
+
+    local escorted = false
+    if t.kind == "ship" and cls == "unknown" then
+      for _, f in ipairs(friends) do
+        if V.dist3d(f.pos, t.pos) <= cfg.escortDist then escorted = true break end
+      end
+    end
+
+    local function emit(type, extra)
+      local ev = { type = type, target = snapshot(t, cls, zone) }
+      for k, v in pairs(extra or {}) do ev[k] = v end
+      events[#events + 1] = ev
+    end
+
+    if cls == "other" then
+      decisions[t.id] = { action = "ignore", cls = cls }
+    elseif cls == "trusted" or cls == "visitor" or escorted then
+      if st.zoneSince then emit("zone_cleared") end
+      st.zoneSince, st.engaged, st.hostileSeen = nil, false, false
+      decisions[t.id] = { action = "friendly", cls = cls, escorted = escorted or nil }
+    elseif cls == "hostile" then
+      if not st.hostileSeen then
+        emit("hostile")
+        st.hostileSeen = true
+      end
+      decisions[t.id] = { action = "engage", cls = cls }
+    else -- unknown
+      st.hostileSeen = false
+      if not st.detected then
+        emit("detected")
+        st.detected = true
+      end
+      local inside = Z.contains(zone, t.pos)
+      if zone then
+        -- rings are only announced outside the zone; inside, the zone alert says enough
+        local d = Z.distance(zone, t.pos)
+        for _, r in ipairs(cfg.rings) do
+          if d <= r and not st.rings[r] then
+            st.rings[r] = true
+            if not inside then emit("approach", { ring = r }) end
+          end
+        end
+      end
+      if inside then
+        if not st.zoneSince then
+          st.zoneSince = now
+          emit("zone_enter", { countdownMs = cfg.countdownMs })
+        end
+        local left = cfg.countdownMs - (now - st.zoneSince)
+        if left <= 0 then
+          if not st.engaged then
+            st.engaged = true
+            emit("engage")
+          end
+          decisions[t.id] = { action = "engage", cls = cls }
+        else
+          decisions[t.id] = { action = "warn", cls = cls, remainingMs = left }
+        end
+      else
+        if st.zoneSince then emit("zone_leave") end
+        st.zoneSince, st.engaged = nil, false
+        decisions[t.id] = { action = "watch", cls = cls }
+      end
+    end
+  end
+  return decisions, events
+end
+
+return P

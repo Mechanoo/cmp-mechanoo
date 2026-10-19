@@ -10,8 +10,9 @@ States: idea / in progress / tested in game
 | 2 | Auto reorder | idea |
 | 3 | Create monitor (stress/speed) | idea |
 | 4 | Train schedule display | idea |
-| 5 | Radar overview | idea |
-| 6 | Player detector | idea |
+| 5 | Radar overview: target list, lists, no-go zone, Discord (terminal UI) | in progress (tested locally, not yet in game) |
+| 5b | Radar map on monitor / DirectGPU | idea |
+| 6 | Player detector | merged into 5 |
 | 7 | Cannon calculator | idea |
 | 8 | Shop / bank (Numismatics) | idea |
 | 9 | Radar auto-targeting | idea |

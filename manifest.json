@@ -1,5 +1,5 @@
 {
- "version": "f44862d478",
+ "version": "bd09ae1574",
  "files": [
   {
    "path": "apps/discord-test/main.lua",
@@ -10,12 +10,36 @@
    "size": 4376
   },
   {
+   "path": "apps/radar/main.lua",
+   "size": 13242
+  },
+  {
    "path": "bin/void.lua",
    "size": 1775
   },
   {
+   "path": "lib/alerts.lua",
+   "size": 3695
+  },
+  {
+   "path": "lib/commands.lua",
+   "size": 8678
+  },
+  {
    "path": "lib/discord.lua",
    "size": 2775
+  },
+  {
+   "path": "lib/duration.lua",
+   "size": 994
+  },
+  {
+   "path": "lib/lists.lua",
+   "size": 3296
+  },
+  {
+   "path": "lib/policy.lua",
+   "size": 4655
   },
   {
    "path": "lib/probe_core.lua",
@@ -26,8 +50,20 @@
    "size": 1094
   },
   {
+   "path": "lib/tracker.lua",
+   "size": 6316
+  },
+  {
    "path": "lib/updater.lua",
    "size": 5554
+  },
+  {
+   "path": "lib/vec.lua",
+   "size": 551
+  },
+  {
+   "path": "lib/zone.lua",
+   "size": 1409
   }
  ]
 }

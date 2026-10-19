@@ -1,0 +1,248 @@
+-- Console commands of the radar service. Pure logic: works on a context and
+-- returns text lines, so it can be tested without a computer.
+--
+-- ctx = {
+--   lists, tracker, config (zone, visitorDefaultMs), now,
+--   radarCenter = {x,y,z} or nil,   -- average radar position, for "zone radars"
+-- }
+-- Returns { lines = {...}, events = {...}, configChanged = bool }
+local lists = require("lib.lists")
+local tracker = require("lib.tracker")
+local Z = require("lib.zone")
+local D = require("lib.duration")
+local V = require("lib.vec")
+
+local C = {}
+
+C.HELP = {
+  "targets            what the radar sees now",
+  "players            player lists",
+  "ships              ships (seen now and listed)",
+  "trust <name>       hostile <name>",
+  "visitor <name> [time]   e.g. visitor Bob 45m",
+  "forget <name>      back to unknown",
+  "ship <id> trust|hostile|forget|visitor [time]",
+  "label <id> <text>  name a ship",
+  "zone               show the no-go zone",
+  "zone center <x> <z> [chunks]",
+  "zone radars [chunks]   centre on the radars",
+}
+
+local function words(line)
+  local w = {}
+  for p in line:gmatch("%S+") do w[#w + 1] = p end
+  return w
+end
+
+local function validName(n)
+  return type(n) == "string" and n:match("^[%w_]+$") ~= nil and #n <= 16
+end
+
+local function describeTarget(t, ls, zone)
+  local cls = tracker.classify(t, ls)
+  local who
+  if t.kind == "player" then
+    who = t.name or ("player " .. tracker.short(t.id))
+  elseif t.kind == "ship" then
+    local e = ls.ships[t.id]
+    who = "ship " .. tracker.short(t.id) .. ((e and e.label) and (" '" .. e.label .. "'") or "")
+  else
+    who = tostring(t.category or "?") .. " " .. tracker.short(t.id)
+  end
+  local dist = zone and ("%4d"):format(math.floor(Z.distance(zone, t.pos) + 0.5)) or "   ?"
+  local inside = Z.contains(zone, t.pos) and " ZONE" or ""
+  return ("%-8s %s %s%s"):format(cls, dist, who, inside)
+end
+
+-- Finds a ship by id prefix among current targets and listed ships.
+local function findShip(ctx, prefix)
+  prefix = (prefix or ""):lower()
+  if #prefix < 3 then return nil, "give at least 3 characters of the ship id" end
+  local found = {}
+  for id, t in pairs(ctx.tracker.targets) do
+    if t.kind == "ship" and id:lower():sub(1, #prefix) == prefix then found[id] = t end
+  end
+  for id in pairs(ctx.lists.ships) do
+    if id:lower():sub(1, #prefix) == prefix then found[id] = found[id] or true end
+  end
+  local ids = {}
+  for id in pairs(found) do ids[#ids + 1] = id end
+  if #ids == 0 then return nil, "no ship with id " .. prefix .. "..." end
+  if #ids > 1 then return nil, "several ships start with " .. prefix .. ", give more characters" end
+  local t = found[ids[1]]
+  return ids[1], (t ~= true) and t or nil
+end
+
+function C.run(ctx, line)
+  local out = { lines = {}, events = {}, configChanged = false }
+  local function say(s) out.lines[#out.lines + 1] = s end
+  local function changed(text) out.events[#out.events + 1] = { type = "list_change", text = text } end
+
+  local w = words(line or "")
+  local cmd = (w[1] or ""):lower()
+  local ls, cfg, now = ctx.lists, ctx.config, ctx.now
+
+  if cmd == "" then
+    return out
+  elseif cmd == "help" or cmd == "?" then
+    for _, l in ipairs(C.HELP) do say(l) end
+
+  elseif cmd == "targets" or cmd == "t" then
+    local all = tracker.all(ctx.tracker)
+    if #all == 0 then say("nothing in range") end
+    for _, t in ipairs(all) do say(describeTarget(t, ls, cfg.zone)) end
+
+  elseif cmd == "players" then
+    local keys = {}
+    for k in pairs(ls.players) do keys[#keys + 1] = k end
+    table.sort(keys)
+    if #keys == 0 then say("no players listed (everyone is unknown)") end
+    for _, k in ipairs(keys) do
+      local e = ls.players[k]
+      local extra = ""
+      if e.list == "visitor" then
+        extra = " (" .. D.format(e.expires - now) .. " left, then " .. (e.prev or "unknown") .. ")"
+      end
+      say(("%-8s %s%s"):format(e.list, e.name, extra))
+    end
+
+  elseif cmd == "trust" or cmd == "hostile" or cmd == "forget" or cmd == "unknown" or cmd == "visitor" then
+    local name = w[2]
+    if not validName(name) then
+      say("usage: " .. cmd .. " <player name>")
+      return out
+    end
+    if cmd == "visitor" then
+      local ms = cfg.visitorDefaultMs or 30 * 60000
+      if w[3] then
+        ms = D.parse(w[3])
+        if not ms then
+          say("bad time '" .. w[3] .. "', use e.g. 30m, 2h, 1h30m")
+          return out
+        end
+      end
+      lists.setPlayer(ls, name, "visitor", now, ms)
+      say(name .. " is a visitor for " .. D.format(ms))
+      changed(name .. " is a visitor for " .. D.format(ms))
+    elseif cmd == "forget" or cmd == "unknown" then
+      if lists.setPlayer(ls, name, nil, now) then
+        say(name .. " is unknown again")
+        changed(name .. " removed from the lists (unknown)")
+      else
+        say(name .. " was not on a list")
+      end
+    else
+      local list = cmd == "trust" and "trusted" or "hostile"
+      lists.setPlayer(ls, name, list, now)
+      say(name .. " is now " .. list)
+      changed(name .. " is now " .. list)
+    end
+
+  elseif cmd == "ships" then
+    local any = false
+    for _, t in ipairs(tracker.all(ctx.tracker)) do
+      if t.kind == "ship" then
+        say("seen   " .. describeTarget(t, ls, cfg.zone) .. "  id " .. t.id)
+        any = true
+      end
+    end
+    for id, e in pairs(ls.ships) do
+      if not ctx.tracker.targets[id] then
+        local extra = e.lastSeen and (" last seen " .. D.format(now - e.lastSeen) .. " ago") or ""
+        say(("listed %-8s ship %s%s%s"):format(e.list, tracker.short(id), e.label and (" '" .. e.label .. "'") or "", extra))
+        any = true
+      end
+    end
+    if not any then say("no ships seen or listed") end
+
+  elseif cmd == "ship" then
+    local id, t = findShip(ctx, w[2])
+    if not id then
+      say(t)
+      return out
+    end
+    local action = (w[3] or ""):lower()
+    local info = t and { pos = V.copy(t.pos), seen = now } or nil
+    local short = tracker.short(id)
+    if action == "trust" or action == "hostile" then
+      local list = action == "trust" and "trusted" or "hostile"
+      lists.setShip(ls, id, list, now, nil, info)
+      say("ship " .. short .. " is now " .. list)
+      changed("ship " .. short .. " is now " .. list)
+    elseif action == "visitor" then
+      local ms = cfg.visitorDefaultMs or 30 * 60000
+      if w[4] then
+        ms = D.parse(w[4])
+        if not ms then
+          say("bad time '" .. w[4] .. "'")
+          return out
+        end
+      end
+      lists.setShip(ls, id, "visitor", now, ms, info)
+      say("ship " .. short .. " is a visitor for " .. D.format(ms))
+      changed("ship " .. short .. " is a visitor for " .. D.format(ms))
+    elseif action == "forget" or action == "unknown" then
+      lists.setShip(ls, id, nil, now)
+      say("ship " .. short .. " is unknown again")
+      changed("ship " .. short .. " removed from the lists")
+    else
+      say("usage: ship <id> trust|hostile|visitor [time]|forget")
+    end
+
+  elseif cmd == "label" then
+    local id, t = findShip(ctx, w[2])
+    if not id then
+      say(t)
+      return out
+    end
+    local text = table.concat(w, " ", 3)
+    if text == "" or #text > 24 then
+      say("usage: label <id> <text up to 24 characters>")
+      return out
+    end
+    local e = ls.ships[id]
+    if not e then
+      say("list the ship first (ship " .. tracker.short(id) .. " trust|hostile|visitor)")
+      return out
+    end
+    e.label = text
+    ls.dirty = true
+    say("ship " .. tracker.short(id) .. " is now called '" .. text .. "'")
+
+  elseif cmd == "zone" then
+    local sub = (w[2] or ""):lower()
+    if sub == "" then
+      say("zone: " .. Z.describe(cfg.zone))
+    elseif sub == "center" or sub == "centre" then
+      local x, z, n = tonumber(w[3]), tonumber(w[4]), tonumber(w[5] or "10")
+      if not (x and z and n) or n < 1 or n > 64 or n % 1 ~= 0 then
+        say("usage: zone center <x> <z> [chunks 1-64]")
+        return out
+      end
+      cfg.zone = Z.fromCenter(x, z, n)
+      out.configChanged = true
+      say("zone: " .. Z.describe(cfg.zone))
+    elseif sub == "radars" then
+      local n = tonumber(w[3] or "10")
+      if not ctx.radarCenter then
+        say("no radar position known")
+        return out
+      end
+      if not n or n < 1 or n > 64 or n % 1 ~= 0 then
+        say("usage: zone radars [chunks 1-64]")
+        return out
+      end
+      cfg.zone = Z.fromCenter(ctx.radarCenter.x, ctx.radarCenter.z, n)
+      out.configChanged = true
+      say("zone: " .. Z.describe(cfg.zone))
+    else
+      say("usage: zone | zone center <x> <z> [chunks] | zone radars [chunks]")
+    end
+
+  else
+    say("unknown command '" .. cmd .. "', type help")
+  end
+  return out
+end
+
+return C
