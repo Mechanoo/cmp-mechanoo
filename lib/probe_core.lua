@@ -50,9 +50,14 @@ function core.addTracks(s, radarName, tracks)
       s.order[#s.order + 1] = id
     end
     if rec.lastIdx ~= s.samples then -- count once per sample, even if two radars see it
-      if rec.lastIdx and s.samples - rec.lastIdx > 1 then rec.reappear = rec.reappear + 1 end
+      if rec.lastIdx and s.samples - rec.lastIdx > 1 then
+        rec.reappear = rec.reappear + 1
+        local gap = s.cur.t - rec.lastT
+        if not rec.maxGap or gap > rec.maxGap then rec.maxGap = gap end
+      end
       rec.n = rec.n + 1
       rec.lastIdx = s.samples
+      rec.lastT = s.cur.t
     end
     rec.last = s.cur.t
     rec.radars[radarName] = true
@@ -75,10 +80,16 @@ end
 
 function core.endSample(s)
   for _, p in ipairs(s.cur.players) do
+    -- A player is only compared with PLAYER tracks. If the radar reports the same
+    -- UUID as the detector, that track wins regardless of distance.
     local best, bd
     for _, tr in ipairs(s.cur.tracks) do
-      if tr.position then
+      if tr.position and (tr.category == nil or tr.category == "PLAYER") then
         local d = dist2d(p, tr.position)
+        if p.uuid and tostring(tr.id) == tostring(p.uuid) then
+          best, bd = tr, d
+          break
+        end
         if not bd or d < bd then best, bd = tr, d end
       end
     end
@@ -143,6 +154,14 @@ function core.summarize(s)
     count(types, rec.entityType)
   end
   L[#L + 1] = ("track ids: %d unique, %d seen only once, %d came back after a gap"):format(#s.order, once, again)
+
+  for _, id in ipairs(s.order) do
+    local rec = s.tracks[id]
+    local nr = 0
+    for _ in pairs(rec.radars) do nr = nr + 1 end
+    L[#L + 1] = ("  %s %s: seen in %d/%d samples by %d radar(s), first %.0fs, last %.0fs, longest gap %.0fs"):format(
+      tostring(rec.category), id, rec.n, s.samples, nr, rec.first, rec.last, rec.maxGap or 0)
+  end
 
   local parts = {}
   for _, k in ipairs(sortedKeys(cats)) do parts[#parts + 1] = k .. "=" .. cats[k] end

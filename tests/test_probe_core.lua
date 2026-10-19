@@ -61,4 +61,26 @@ t.eq(core.classify({ "create_radar:monitor" }, { "getTracks", "getSelectedTrack"
 t.eq(core.classify({ "cannon_mount" }, { "setTargetAngles", "getInfo", "fire" }), "cannon", "cannon mount by methods")
 t.eq(core.classify({ "minecraft:chest" }, { "list" }), nil, "chest is nothing")
 
+-- a ship next to the player must not be taken for the player
+local s4 = core.new()
+for i = 1, 3 do
+  core.beginSample(s4, i * 2)
+  core.addTracks(s4, "west", { track("ship", 10, 10, "SABLE"), track("me", 13, 10, "PLAYER") })
+  core.addPlayers(s4, { { name = "Me", uuid = "me", x = 10.5, y = 64, z = 10 } })
+  core.endSample(s4)
+end
+t.eq(s4.pairs["Me"].ids["me"], 3, "player matched to own uuid, not to the closer ship")
+t.eq(s4.pairs["Me"].ids["ship"], nil, "ship never matched as player")
+t.eq(s4.pairs["Me"].uuidMatches, 3, "uuid equal in all samples")
+
+-- gaps are measured in seconds
+local s5 = core.new()
+for _, tt in ipairs({ 0, 2, 10, 12 }) do
+  core.beginSample(s5, tt)
+  core.addTracks(s5, "n", (tt == 0 or tt == 10) and { track("g", 0, 0, "SABLE") } or {})
+  core.endSample(s5)
+end
+t.eq(s5.tracks["g"].maxGap, 10, "longest gap 10 s")
+t.contains(table.concat(core.summarize(s5), "\n"), "longest gap 10s", "gap in summary")
+
 t.finish("probe_core")

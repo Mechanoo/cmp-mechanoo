@@ -1,5 +1,5 @@
 {
- "version": "8fea769170",
+ "version": "cc79ab813d",
  "files": [
   {
    "path": "apps/discord-test/main.lua",
@@ -19,7 +19,7 @@
   },
   {
    "path": "lib/probe_core.lua",
-   "size": 6076
+   "size": 6899
   },
   {
    "path": "lib/store.lua",
