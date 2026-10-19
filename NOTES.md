@@ -37,3 +37,7 @@ Peripheral names and quirks found in the world. Add output of `peripherals` here
 - `getPlayer(name or uuid)` returns the ENTITY TYPE in `name` ("minecraft:player"), not the player name.
 - The player name comes from the list of `getPlayersInRange` (strings) or from `displayName` (from the AP LuaConverter).
 - `getPlayer` also accepts a UUID, so a radar-only PLAYER track can be resolved to a name.
+
+## Ghost tracks after a chunk load (radar app, singleplayer)
+- About 13 s after the base chunks loaded again, the plane radars reported six SABLE tracks at once inside the zone; each was seen in exactly one sample and never again. The real ship nearby kept its id.
+- The radar app now needs two sightings of an unknown radar-only target before it alerts or counts down.
