@@ -1,8 +1,8 @@
 -- probe: measures what the radars and the player detector really return.
---   cmp probe [seconds] [--discord]
+--   void probe [seconds] [--discord]
 -- Run it with a player (or ship) moving around in range, then look at the report.
 -- With --discord the report goes to your log channel (see discord-test).
-package.path = "/cmp/?.lua;" .. package.path
+package.path = "/void/?.lua;" .. package.path
 local core = require("lib.probe_core")
 local store = require("lib.store")
 
@@ -97,7 +97,7 @@ out("")
 out("Report:")
 for _, line in ipairs(core.summarize(stats)) do out(line) end
 store.writeText("probe-report.txt", table.concat(report, "\n"))
-print("Saved to /cmp-data/probe-report.txt")
+print("Saved to /void-data/probe-report.txt")
 
 if toDiscord then
   local discord = require("lib.discord")

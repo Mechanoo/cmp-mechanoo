@@ -1,15 +1,15 @@
--- cmp: launcher for the CMP programs.
---   cmp help | version | list | update | run <app> [args...] | <app> [args...]
-package.path = "/cmp/?.lua;" .. package.path
+-- void: launcher for the programs of team Void.
+--   void help | version | list | update | run <app> [args...] | <app> [args...]
+package.path = "/void/?.lua;" .. package.path
 
 local args = { ... }
 local cmd = args[1]
 
 local function apps()
   local out = {}
-  if fs.exists("/cmp/apps") then
-    for _, name in ipairs(fs.list("/cmp/apps")) do
-      if fs.exists("/cmp/apps/" .. name .. "/main.lua") then out[#out + 1] = name end
+  if fs.exists("/void/apps") then
+    for _, name in ipairs(fs.list("/void/apps")) do
+      if fs.exists("/void/apps/" .. name .. "/main.lua") then out[#out + 1] = name end
     end
   end
   table.sort(out)
@@ -17,8 +17,8 @@ local function apps()
 end
 
 local function version()
-  if not fs.exists("/cmp/version.json") then return nil end
-  local h = fs.open("/cmp/version.json", "r")
+  if not fs.exists("/void/version.json") then return nil end
+  local h = fs.open("/void/version.json", "r")
   local v = textutils.unserialiseJSON(h.readAll())
   h.close()
   return v and v.version
@@ -29,20 +29,20 @@ local function runApp(name, rest)
     printError("Bad app name.")
     return
   end
-  local path = "/cmp/apps/" .. name .. "/main.lua"
+  local path = "/void/apps/" .. name .. "/main.lua"
   if not fs.exists(path) then
-    printError("Unknown app '" .. name .. "'. Try: cmp list")
+    printError("Unknown app '" .. name .. "'. Try: void list")
     return
   end
   shell.run(path, table.unpack(rest))
 end
 
 if cmd == nil or cmd == "help" then
-  print("cmp - Void tools")
-  print("  cmp list           installed apps")
-  print("  cmp <app> [args]   run an app")
-  print("  cmp update         update everything")
-  print("  cmp version        installed version")
+  print("void - tools of team Void")
+  print("  void list          installed apps")
+  print("  void <app> [args]  run an app")
+  print("  void update        update everything")
+  print("  void version       installed version")
 elseif cmd == "version" then
   print(tostring(version() or "not installed"))
 elseif cmd == "list" then

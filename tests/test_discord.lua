@@ -23,7 +23,7 @@ http = {
 }
 discord.delay = 0
 
-fs.delete("/cmp-data")
+fs.delete("/void-data")
 
 local ok, err = discord.send("alerts", "hi")
 t.eq(ok, false, "no config -> fails")
@@ -66,5 +66,5 @@ ok = discord.send("alerts", "x")
 t.eq(ok, false, "invalid url refused")
 t.eq(#calls, 0, "no request for an invalid url")
 
-fs.delete("/cmp-data")
+fs.delete("/void-data")
 t.finish("discord")

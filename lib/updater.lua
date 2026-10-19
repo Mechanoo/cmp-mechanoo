@@ -1,15 +1,19 @@
--- Installer/updater. Downloads manifest.json and every file listed in it into /cmp.
+-- Installer/updater. Downloads manifest.json and every file listed in it into /void.
 -- All files are downloaded and size-checked BEFORE anything on disk is touched.
 local M = {}
 
 M.BASE = "https://raw.githubusercontent.com/Mechanoo/cmp-mechanoo/main/"
-M.ROOT = "/cmp"
-M.STARTUP = "/startup/cmp.lua"
+M.ROOT = "/void"
+M.STARTUP = "/startup/void.lua"
+M.DATA = "/void-data"
+
+-- First versions installed to /cmp with the "cmp" command and kept data in /cmp-data.
+M.LEGACY = { root = "/cmp", data = "/cmp-data", startup = "/startup/cmp.lua" }
 
 local STARTUP_CODE = [[
--- installed by cmp: adds the "cmp" command to the shell path
-if not string.find(shell.path(), "/cmp/bin", 1, true) then
-  shell.setPath(shell.path() .. ":/cmp/bin")
+-- installed by void: adds the "void" command to the shell path
+if not string.find(shell.path(), "/void/bin", 1, true) then
+  shell.setPath(shell.path() .. ":/void/bin")
 end
 ]]
 
@@ -46,6 +50,44 @@ local function readJson(path)
   local s = h.readAll()
   h.close()
   return textutils.unserialiseJSON(s)
+end
+
+-- Moves data of the old /cmp install to the new place and removes the old install.
+-- Only touches /cmp if it holds our version.json, and the old startup file only if we wrote it.
+-- Returns a list of what was done.
+function M.migrateLegacy(legacy, dataDir)
+  legacy = legacy or M.LEGACY
+  dataDir = dataDir or M.DATA
+  local done = {}
+  if fs.exists(legacy.data) and fs.isDir(legacy.data) then
+    if not fs.exists(dataDir) then
+      fs.move(legacy.data, dataDir)
+      done[#done + 1] = "moved " .. legacy.data .. " to " .. dataDir
+    else
+      for _, name in ipairs(fs.list(legacy.data)) do
+        local src, dst = fs.combine(legacy.data, name), fs.combine(dataDir, name)
+        if not fs.exists(dst) then
+          fs.move(src, dst)
+          done[#done + 1] = "moved " .. src .. " to " .. dst
+        end
+      end
+      if #fs.list(legacy.data) == 0 then fs.delete(legacy.data) end
+    end
+  end
+  if fs.exists(fs.combine(legacy.root, "version.json")) then
+    fs.delete(legacy.root)
+    done[#done + 1] = "removed old install " .. legacy.root
+  end
+  if fs.exists(legacy.startup) then
+    local h = fs.open(legacy.startup, "r")
+    local text = h.readAll()
+    h.close()
+    if text:find("installed by cmp", 1, true) then
+      fs.delete(legacy.startup)
+      done[#done + 1] = "removed " .. legacy.startup
+    end
+  end
+  return done
 end
 
 -- opts: root, startup (false = do not write), force, print
@@ -111,8 +153,12 @@ function M.run(base, opts)
     end
     if cur ~= STARTUP_CODE then writeFile(startup, STARTUP_CODE) end
   end
-  if shell and not opts.noShell and not string.find(shell.path(), "/cmp/bin", 1, true) then
-    shell.setPath(shell.path() .. ":/cmp/bin")
+  if shell and not opts.noShell and not string.find(shell.path(), "/void/bin", 1, true) then
+    shell.setPath(shell.path() .. ":/void/bin")
+  end
+
+  if not opts.root then
+    for _, line in ipairs(M.migrateLegacy()) do say(line) end
   end
 
   say("Installed version " .. tostring(mf.version) .. " (" .. #paths .. " files)")

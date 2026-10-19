@@ -1,7 +1,7 @@
 -- discord-test: stores your Discord webhook URLs locally and sends a test message.
---   cmp discord-test          send a test (asks for URLs on first run)
---   cmp discord-test set      enter the URLs again
-package.path = "/cmp/?.lua;" .. package.path
+--   void discord-test          send a test (asks for URLs on first run)
+--   void discord-test set      enter the URLs again
+package.path = "/void/?.lua;" .. package.path
 local discord = require("lib.discord")
 
 local args = { ... }
@@ -21,7 +21,7 @@ local function ask(label, key)
 end
 
 if args[1] == "set" or not (cfg.alerts or cfg.log) then
-  print("The URLs are stored only on this computer in /cmp-data/discord.json.")
+  print("The URLs are stored only on this computer in /void-data/discord.json.")
   ask("Alerts", "alerts")
   ask("Log", "log")
   discord.saveConfig(cfg)

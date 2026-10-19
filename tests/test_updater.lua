@@ -2,7 +2,7 @@ local t = require("tests.t")
 local updater = require("lib.updater")
 
 local BASE = "https://raw.githubusercontent.com/Mechanoo/cmp-mechanoo/main/"
-local ROOT = "/cmp-test"
+local ROOT = "/void-test"
 fs.delete(ROOT)
 
 -- Mock http.get: serves files from the project folder (/work); `served` overrides.
@@ -30,7 +30,7 @@ local ok, res = updater.run(BASE, opts)
 t.eq(ok, true, "first install ok: " .. tostring(res))
 t.eq(res, "updated", "first install updates")
 t.truthy(fs.exists(ROOT .. "/lib/updater.lua"), "updater installed")
-t.truthy(fs.exists(ROOT .. "/bin/cmp.lua"), "launcher installed")
+t.truthy(fs.exists(ROOT .. "/bin/void.lua"), "launcher installed")
 t.truthy(fs.exists(ROOT .. "/apps/probe/main.lua"), "probe installed")
 t.truthy(fs.exists(ROOT .. "/version.json"), "version written")
 
@@ -76,4 +76,38 @@ for _, bad in ipairs({ "../evil.lua", "/startup.lua", "a/../../b.lua", "x y.lua"
 end
 
 fs.delete(ROOT)
+
+-- migration of the old /cmp install (test paths, so the emulator's real files stay untouched)
+local L = { root = "/mig/cmp", data = "/mig/cmp-data", startup = "/mig/startup/cmp.lua" }
+local function put(path, text)
+  local h = fs.open(path, "w"); h.write(text); h.close()
+end
+fs.delete("/mig")
+put(L.root .. "/version.json", "{}")
+put(L.root .. "/lib/x.lua", "-- old")
+put(L.data .. "/discord.json", '{"alerts":"u"}')
+put(L.startup, "-- installed by cmp: adds the \"cmp\" command to the shell path")
+local done = updater.migrateLegacy(L, "/mig/void-data")
+t.eq(#done, 3, "three migration steps")
+t.truthy(fs.exists("/mig/void-data/discord.json"), "data moved")
+t.eq(fs.exists(L.data), false, "old data dir gone")
+t.eq(fs.exists(L.root), false, "old install removed")
+t.eq(fs.exists(L.startup), false, "old startup removed")
+t.eq(#updater.migrateLegacy(L, "/mig/void-data"), 0, "second run does nothing")
+
+-- foreign files are left alone
+fs.delete("/mig")
+put(L.root .. "/notes.txt", "not ours")
+put(L.startup, "print('my own startup')")
+put("/mig/void-data/discord.json", "new")
+put(L.data .. "/discord.json", "old")
+put(L.data .. "/probe-report.txt", "r")
+done = updater.migrateLegacy(L, "/mig/void-data")
+t.truthy(fs.exists(L.root .. "/notes.txt"), "a /cmp without our version.json stays")
+t.truthy(fs.exists(L.startup), "a foreign startup file stays")
+local h = fs.open("/mig/void-data/discord.json", "r"); t.eq(h.readAll(), "new", "existing new data wins"); h.close()
+t.truthy(fs.exists("/mig/void-data/probe-report.txt"), "missing file moved over")
+t.truthy(fs.exists(L.data .. "/discord.json"), "conflicting old file kept")
+fs.delete("/mig")
+
 t.finish("updater")

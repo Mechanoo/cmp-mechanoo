@@ -15,12 +15,12 @@ local function loadApp(path)
 end
 
 -- every shipped file must at least compile
-for _, p in ipairs({ "/work/bin/cmp.lua", "/work/install.lua", "/work/lib/updater.lua",
+for _, p in ipairs({ "/work/bin/void.lua", "/work/install.lua", "/work/lib/updater.lua",
                      "/work/apps/probe/main.lua", "/work/apps/discord-test/main.lua" }) do
   loadApp(p)
 end
 
-fs.delete("/cmp-data")
+fs.delete("/void-data")
 
 -- fake clock so the probe finishes instantly
 local now = 1000000
@@ -76,7 +76,7 @@ dt()
 t.eq(asked, 2, "asked for two urls")
 t.eq(#posts, 2, "sent two test messages")
 t.contains(posts[1], "http.post works", "test message text")
-local cfg = textutils.unserialiseJSON(readAll("/cmp-data/discord.json"))
+local cfg = textutils.unserialiseJSON(readAll("/void-data/discord.json"))
 t.eq(cfg.alerts, answers[1], "alerts url saved")
 t.eq(cfg.log, answers[2], "log url saved")
 posts = {}
@@ -88,7 +88,7 @@ t.eq(#posts, 2, "sends again")
 posts = {}
 local probe = loadApp("/work/apps/probe/main.lua")
 probe("10", "--discord")
-local report = readAll("/cmp-data/probe-report.txt")
+local report = readAll("/void-data/probe-report.txt")
 t.contains(report, "Found 1 radar(s), 1 player detector(s), 1 cannon mount(s).", "found devices")
 t.contains(report, "cannon gun info=", "cannon info reported")
 for _, m in ipairs(cannonCalls) do t.eq(m, "getInfo", "probe only reads the cannon") end
@@ -99,5 +99,5 @@ t.contains(report, "2 unique", "two track ids")
 t.truthy(#posts >= 1, "report sent to discord")
 t.contains(posts[1], "probe report", "discord title")
 
-fs.delete("/cmp-data")
+fs.delete("/void-data")
 t.finish("apps")

@@ -1,21 +1,21 @@
 {
- "version": "cc79ab813d",
+ "version": "f44862d478",
  "files": [
   {
    "path": "apps/discord-test/main.lua",
-   "size": 1252
+   "size": 1256
   },
   {
    "path": "apps/probe/main.lua",
-   "size": 4373
+   "size": 4376
   },
   {
-   "path": "bin/cmp.lua",
-   "size": 1747
+   "path": "bin/void.lua",
+   "size": 1775
   },
   {
    "path": "lib/discord.lua",
-   "size": 2774
+   "size": 2775
   },
   {
    "path": "lib/probe_core.lua",
@@ -23,11 +23,11 @@
   },
   {
    "path": "lib/store.lua",
-   "size": 1090
+   "size": 1094
   },
   {
    "path": "lib/updater.lua",
-   "size": 3910
+   "size": 5554
   }
  ]
 }

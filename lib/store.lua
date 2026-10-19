@@ -1,8 +1,8 @@
--- Small JSON/text storage under /cmp-data.
--- /cmp-data is separate from /cmp, so updates never overwrite user data or secrets.
+-- Small JSON/text storage under /void-data.
+-- /void-data is separate from /void, so updates never overwrite user data or secrets.
 local store = {}
 
-store.DIR = "/cmp-data"
+store.DIR = "/void-data"
 
 local function path(name)
   return fs.combine(store.DIR, name)

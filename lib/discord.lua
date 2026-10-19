@@ -1,5 +1,5 @@
 -- Discord webhook sender.
--- Webhook URLs are secrets. They live in /cmp-data/discord.json on the computer
+-- Webhook URLs are secrets. They live in /void-data/discord.json on the computer
 -- ({ alerts = "<url>", log = "<url>" }) and are never part of this repository.
 local store = require("lib.store")
 

@@ -10,23 +10,25 @@ On a computer with HTTP enabled:
 
     wget run https://raw.githubusercontent.com/Mechanoo/cmp-mechanoo/main/install.lua
 
-This installs everything to `/cmp` and adds the `cmp` command. Update later with `cmp update`.
+This installs everything to `/void` and adds the `void` command. Update later with `void update`.
 GitHub caches raw files for a few minutes, so a fresh push can take up to ~5 minutes to arrive.
 
+Upgrading from the first versions (`cmp` command, `/cmp`): run the install command above once. It moves your data from `/cmp-data` to `/void-data` and removes the old `/cmp` install.
+
 ## Commands
-- `cmp list` shows installed apps
-- `cmp <app> [args]` runs an app
-- `cmp update` updates everything
-- `cmp version` shows the installed version
+- `void list` shows installed apps
+- `void <app> [args]` runs an app
+- `void update` updates everything
+- `void version` shows the installed version
 
 ## Apps
 | App | What it does |
 |---|---|
-| `discord-test` | Asks for your Discord webhook URLs (stored only on that computer in `/cmp-data/discord.json`) and sends a test message |
-| `probe` | Measures what Plane Radars and the Player Detector return (id stability, positions). `cmp probe 60 --discord` sends the report to your log channel |
+| `discord-test` | Asks for your Discord webhook URLs (stored only on that computer in `/void-data/discord.json`) and sends a test message |
+| `probe` | Measures what Plane Radars and the Player Detector return (id stability, positions). `void probe 60 --discord` sends the report to your log channel |
 
 ## Layout
-- `bin/` the `cmp` command
+- `bin/` the `void` command
 - `lib/` shared libraries (`store`, `discord`, `updater`, `probe_core`)
 - `apps/<name>/main.lua` one folder per program
 - `tests/` logic tests, run in CraftOS-PC with mocked peripherals

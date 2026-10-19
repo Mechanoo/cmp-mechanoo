@@ -27,4 +27,4 @@ if not ok then
   printError("Install failed: " .. tostring(msg))
   return
 end
-print("Done. Type 'cmp help' (or reboot once if the command is not found).")
+print("Done. Type 'void help' (or reboot once if the command is not found).")
