@@ -29,6 +29,6 @@ Peripheral names and quirks found in the world. Add output of `peripherals` here
 - A Sable ship gets a NEW id when it is disassembled and assembled again (19b3... seen 0-37 s, then 8c98... from 41 s).
 - The id stays the same while the ship exists, also after flying out of radar range and back (8c98..., gap 9 s).
 - The player id stayed the same for the whole run (40/40 equal to the detector uuid).
-- A third SABLE id was seen in every sample by exactly one radar and never moved (unknown object, to be identified).
+- A third SABLE id was seen in every sample by exactly one radar and never moved (a leftover test object).
 - Gaps: moving targets near the radar cluster had gaps up to 9 s; the stationary object had none. Target hold time should be at least ~10 s.
 - CC:Sable on a computer ON a ship: `sublevel.getUniqueId()`, `getName()`, `setName()`, poses and velocity. A ship computer can read its own current id.
