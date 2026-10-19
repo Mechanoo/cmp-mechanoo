@@ -304,6 +304,24 @@ function C.run(ctx, line)
     local lines = w[2] and history.details(ctx.history, w[2], off) or history.summary(ctx.history, off, 30)
     for _, l in ipairs(lines) do say(l) end
 
+  elseif cmd == "screen" then
+    local sub = (w[2] or "status"):lower()
+    if sub == "status" or sub == "test" or sub == "events" or sub == "reset" then
+      out.screen = sub
+    elseif sub == "font" then
+      local name = table.concat(w, " ", 3)
+      if name == "" or #name > 40 or name:find("[^%w _%-]") then
+        say("usage: screen font <name>, now " .. tostring(cfg.gpuFont or "SansSerif"))
+        return out
+      end
+      cfg.gpuFont = name
+      out.configChanged = true
+      out.screen = "reset"
+      say("screen font is " .. name .. " now")
+    else
+      say("usage: screen | screen test | screen events | screen reset | screen font <name>")
+    end
+
   elseif cmd == "exit" or cmd == "quit" then
     out.exit = true
     say("stopping the radar")

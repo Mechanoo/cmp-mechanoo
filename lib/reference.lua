@@ -38,6 +38,13 @@ R.GROUPS = {
     { "basename <text>", "Name of the base in Discord messages." },
     { "timezone <hours>", "Shown times use this offset from UTC, e.g. timezone 2. Discord times follow each reader's clock." },
   } },
+  { title = "SCREEN (DirectGPU)", items = {
+    { "screen", "State of the DirectGPU radar screen: display, pixel size, how long the last frame took." },
+    { "screen test", "Draw a test pattern (coloured corners, diagonals, circle, text) for 10 s to check size, orientation and font." },
+    { "screen events", "Log every touch event for 15 s, to see what the display sends." },
+    { "screen reset", "Drop the display and create it again (after moving the monitor or the GPU block)." },
+    { "screen font <name>", "Font for the screen (default SansSerif). Java names like SansSerif, Monospaced or Dialog always exist." },
+  } },
   { title = "SHELL: void (outside the radar)", items = {
     { "void list", "Installed apps." },
     { "void update", "Update everything from GitHub (GitHub caches up to 5 minutes). Restart running apps afterwards." },

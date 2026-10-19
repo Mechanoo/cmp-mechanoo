@@ -23,6 +23,7 @@ local clock = require("lib.clock")
 local siren = require("lib.siren")
 local audiolock = require("lib.audiolock")
 local reference = require("lib.reference")
+local gpuScreen = require("lib.gpu_screen")
 
 local args = { ... }
 local AUTOSTART = "/startup/void_radar.lua"
@@ -523,6 +524,35 @@ local function showCommands()
   for _, win in ipairs({ statusWin, logWin, inputWin }) do win.setVisible(true) end
 end
 
+-- DirectGPU screen: created below, only on the interactive radar.
+local scr
+
+-- Runs one command line (typed at the prompt or tapped on the screen).
+local function execLine(line)
+  local r = commands.run({ lists = ls, tracker = tr, config = cfg, now = now(), radarCenter = radarCenter, history = hist,
+    speakers = #devices.speakers }, line)
+  if r.alarmTest then alarmTestUntil = now() + 3000 end
+  for _, l in ipairs(r.lines) do log(l) end
+  for _, ev in ipairs(r.events) do alerts.push(queue, ev, alertCtx()) end
+  if r.configChanged then saveConfig() end
+  if r.screen and scr then
+    if r.screen == "status" then
+      for _, l in ipairs(gpuScreen.status(scr)) do log(l) end
+    elseif r.screen == "test" then
+      local ok, err = gpuScreen.test(scr)
+      log(ok and "screen test pattern drawn for 10 s" or ("screen test failed: " .. tostring(err)))
+    elseif r.screen == "events" then
+      gpuScreen.watchEvents(scr)
+      log("logging touch events for 15 s, tap the screen")
+    elseif r.screen == "reset" then
+      gpuScreen.reset(scr)
+      log("screen display reset")
+    end
+  end
+  saveLists()
+  return r
+end
+
 local function inputLoop()
   while true do
     term.redirect(inputWin)
@@ -532,16 +562,17 @@ local function inputLoop()
     write("> ")
     local line = read()
     term.redirect(root)
-    local r = commands.run({ lists = ls, tracker = tr, config = cfg, now = now(), radarCenter = radarCenter, history = hist,
-      speakers = #devices.speakers }, line)
-    if r.alarmTest then alarmTestUntil = now() + 3000 end
-    for _, l in ipairs(r.lines) do log(l) end
-    for _, ev in ipairs(r.events) do alerts.push(queue, ev, alertCtx()) end
-    if r.configChanged then saveConfig() end
-    saveLists()
+    local r = execLine(line)
     if r.exit then return end
     if r.pager then showCommands() end
     drawStatus()
+  end
+end
+
+local function screenLoop()
+  while true do
+    gpuScreen.step(scr)
+    sleep(0.25)
   end
 end
 
@@ -591,7 +622,17 @@ if headless then
   parallel.waitForAll(serviceLoop, discordLoop, alarmLoop)
 else
   drawStatus()
-  parallel.waitForAny(serviceLoop, discordLoop, inputLoop, alarmLoop)
+  scr = gpuScreen.new({
+    args = function()
+      return { now = now(), cfg = cfg, tracker = tr, decisions = decisions, lists = ls, history = hist,
+        level = level, log = logLines }
+    end,
+    run = function(cmd) execLine(cmd) end,
+    log = function(text) log(text) end,
+    font = function() return cfg.gpuFont end,
+  })
+  parallel.waitForAny(serviceLoop, discordLoop, inputLoop, alarmLoop, screenLoop)
+  gpuScreen.close(scr)
 end
 saveLists(true)
 for _, spk in ipairs(devices.speakers) do pcall(peripheral.call, spk, "stop") end

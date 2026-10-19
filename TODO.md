@@ -7,7 +7,7 @@ States: idea / in progress / tested in singleplayer / tested on server
 | 12b | Shared UI library (terminal + DirectGPU backends) | idea |
 | 0 | Discord test + radar/detector probe | tested in singleplayer |
 | 5 | Radar: target list, lists, ship takeover, no-go zone, visits/history, Discord embeds, siren, autostart/tab | tested in singleplayer (siren, tab and exit not yet tested in game) |
-| 5b | Radar map on monitor / DirectGPU | idea |
+| 5b | Radar screen on DirectGPU (banner, map, targets, events, visitor stats, touch) | built, tested with a mock only, not in game |
 | 5c | Remote control from a pocket computer (with arm switch) | idea, build together with 9 |
 | 9 | Cannons via CC:CBC (decided: option B), arm switch, angle limits, fire only on fresh sightings | next big step |
 | 7 | Cannon calculator (ballistics) | part of 9 |

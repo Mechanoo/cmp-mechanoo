@@ -26,6 +26,11 @@ function H.record(h, ev)
     h.players[k] = p
   end
   p.name = t.name
+  if not p.totalMs then -- entries from before this field: sum what is still stored
+    p.totalMs = 0
+    for _, v in ipairs(p.recent) do p.totalMs = p.totalMs + (v.stop - v.start) end
+  end
+  p.totalMs = p.totalMs + (ev.stop - ev.start)
   p.visits = p.visits + 1
   p.last = ev.stop
   p.lastList = t.cls
@@ -40,6 +45,39 @@ end
 
 function H.get(h, name)
   return h.players[string.lower(name)]
+end
+
+-- Total time a player spent near the base, in ms.
+function H.totalMs(p)
+  if p.totalMs then return p.totalMs end
+  local sum = 0
+  for _, v in ipairs(p.recent or {}) do sum = sum + (v.stop - v.start) end
+  return sum
+end
+
+-- Visitors sorted by total time (longest first): { {name, visits, totalMs, last}, ... }
+function H.top(h, limit)
+  local all = {}
+  for _, p in pairs(h.players) do
+    all[#all + 1] = { name = p.name, visits = p.visits, totalMs = H.totalMs(p), last = p.last }
+  end
+  table.sort(all, function(a, b)
+    if a.totalMs ~= b.totalMs then return a.totalMs > b.totalMs end
+    return a.name:lower() < b.name:lower()
+  end)
+  while limit and #all > limit do table.remove(all) end
+  return all
+end
+
+-- Number of visits that started within the last `windowMs` (from the stored recent visits).
+function H.recentCount(h, now, windowMs)
+  local n = 0
+  for _, p in pairs(h.players) do
+    for _, v in ipairs(p.recent or {}) do
+      if now - v.start <= windowMs then n = n + 1 end
+    end
+  end
+  return n
 end
 
 -- "2026-10-19 14:02" in UTC, or with an offset in hours.
@@ -65,7 +103,8 @@ end
 function H.details(h, name, offsetHours)
   local p = H.get(h, name)
   if not p then return { "no visits of " .. name } end
-  local lines = { ("%s: %d visit%s since %s"):format(p.name, p.visits, p.visits == 1 and "" or "s", H.time(p.first, offsetHours)) }
+  local lines = { ("%s: %d visit%s since %s, %s in total"):format(p.name, p.visits, p.visits == 1 and "" or "s",
+    H.time(p.first, offsetHours), D.format(H.totalMs(p))) }
   for _, v in ipairs(p.recent) do
     lines[#lines + 1] = ("%s  %s  %s%s%s"):format(H.time(v.start, offsetHours), D.format(v.stop - v.start),
       v.list or "?", v.closest and (", closest " .. v.closest) or "", v.zone and ", in zone" or "")
