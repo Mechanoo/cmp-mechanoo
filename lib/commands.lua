@@ -14,6 +14,7 @@ local D = require("lib.duration")
 local V = require("lib.vec")
 local history = require("lib.history")
 local clock = require("lib.clock")
+local reference = require("lib.reference")
 
 local C = {}
 
@@ -36,6 +37,8 @@ C.HELP = {
   "alarm              siren state",
   "alarm mute [time]  silence the siren (default 10m)",
   "alarm on | alarm test | alarm volume <0-3>",
+  "commands           every command with an explanation",
+  "help <command>     explain one command",
   "exit               stop the radar (back to the shell)",
 }
 
@@ -104,7 +107,21 @@ function C.run(ctx, line)
   if cmd == "" then
     return out
   elseif cmd == "help" or cmd == "?" then
-    for _, l in ipairs(C.HELP) do say(l) end
+    if w[2] then
+      local hits = reference.find(w[2])
+      if #hits == 0 then
+        say("no command '" .. w[2] .. "', type commands for the full list")
+      end
+      for _, it in ipairs(hits) do
+        say(it[1])
+        for _, l in ipairs(reference.wrap(it[2], 50, "  ")) do say(l) end
+      end
+    else
+      for _, l in ipairs(C.HELP) do say(l) end
+    end
+
+  elseif cmd == "commands" or cmd == "cmds" then
+    out.pager = true
 
   elseif cmd == "targets" or cmd == "t" then
     local all = tracker.all(ctx.tracker)

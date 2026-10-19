@@ -23,6 +23,28 @@ end
 local out, r = run("help")
 t.contains(out, "visitor <name>", "help lists visitor")
 
+out = run("help zone")
+t.contains(out, "zone center <x> <z>", "help <command> explains zone")
+t.contains(out, "Centre the zone", "help <command> has the explanation")
+out = run("help nonsense")
+t.contains(out, "no command 'nonsense'", "help on an unknown command")
+out, r = run("commands")
+t.eq(r.pager, true, "commands asks the app for the full-screen list")
+
+local reference = require("lib.reference")
+local rendered = reference.render(26)
+local function shown(cmd)
+  for _, l in ipairs(rendered) do if l[2] == "usage" and l[1]:find(cmd, 1, true) then return true end end
+  return false
+end
+for _, c in ipairs({ "targets", "players", "ships", "history", "trust", "hostile", "visitor", "forget", "ship <id>",
+  "label", "zone", "alarm", "detectrange", "basename", "timezone", "help", "commands", "exit" }) do
+  t.truthy(shown(c), "reference documents " .. c)
+end
+local widest = 0
+for _, l in ipairs(rendered) do if l[2] == "text" and #l[1] > widest then widest = #l[1] end end
+t.truthy(widest <= 26, "explanations wrap to the screen width")
+
 out = run("targets")
 t.contains(out, "Steve", "targets shows the player")
 t.contains(out, "ZONE", "targets shows zone flag")

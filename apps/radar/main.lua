@@ -22,6 +22,7 @@ local history = require("lib.history")
 local clock = require("lib.clock")
 local siren = require("lib.siren")
 local audiolock = require("lib.audiolock")
+local reference = require("lib.reference")
 
 local args = { ... }
 local AUTOSTART = "/startup/void_radar.lua"
@@ -95,6 +96,7 @@ local decisions = {}
 local level = nil
 local lastListsSave = 0
 local serviceDone = false
+local paging = false
 
 local function now() return os.epoch("utc") end
 
@@ -326,7 +328,7 @@ local COLOR = { engage = colors.red, warn = colors.orange, watch = colors.yellow
   pending = colors.lightGray, ignore = colors.gray }
 
 local function drawStatus()
-  if headless then return end
+  if headless or paging then return end
   local w = statusWin
   w.setBackgroundColor(colors.black)
   w.clear()
@@ -482,6 +484,45 @@ local function discordLoop()
   end
 end
 
+-- Full-screen command list. The normal windows are hidden meanwhile and
+-- redrawn afterwards. Keys: up/down, page up/down, space, Q.
+local function showCommands()
+  paging = true
+  for _, win in ipairs({ statusWin, logWin, inputWin }) do win.setVisible(false) end
+  term.redirect(root)
+  local lines = reference.render(W)
+  local rows = H - 1
+  local top, maxTop = 1, math.max(1, #lines - rows + 1)
+  local KIND = { title = colors.yellow, usage = colors.white, text = colors.lightGray }
+  while true do
+    term.setBackgroundColor(colors.black)
+    term.clear()
+    for r = 1, rows do
+      local l = lines[top + r - 1]
+      if l then
+        term.setCursorPos(1, r)
+        term.setTextColor(KIND[l[2]] or colors.white)
+        term.write(l[1]:sub(1, W))
+      end
+    end
+    term.setCursorPos(1, H)
+    term.setTextColor(colors.gray)
+    term.write(("up/down/space scroll, Q closes  %d/%d"):format(math.min(top + rows - 1, #lines), #lines):sub(1, W))
+    local _, key = os.pullEvent("key")
+    if key == keys.q or key == keys.enter then break
+    elseif key == keys.down then top = math.min(maxTop, top + 1)
+    elseif key == keys.up then top = math.max(1, top - 1)
+    elseif key == keys.space or key == keys.pageDown then top = math.min(maxTop, top + rows - 1)
+    elseif key == keys.pageUp then top = math.max(1, top - rows + 1)
+    elseif key == keys.home then top = 1
+    elseif key == keys["end"] then top = maxTop end
+  end
+  paging = false
+  term.setBackgroundColor(colors.black)
+  term.clear()
+  for _, win in ipairs({ statusWin, logWin, inputWin }) do win.setVisible(true) end
+end
+
 local function inputLoop()
   while true do
     term.redirect(inputWin)
@@ -499,6 +540,7 @@ local function inputLoop()
     if r.configChanged then saveConfig() end
     saveLists()
     if r.exit then return end
+    if r.pager then showCommands() end
     drawStatus()
   end
 end
