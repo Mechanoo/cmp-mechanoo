@@ -103,7 +103,7 @@ function P.update(ps, now, targets, ls, zone)
     local inside = Z.contains(zone, t.pos)
     local dist = zone and Z.distance(zone, t.pos) or nil
     st.lostAt = nil
-    st.lastSeenAt = now
+    st.lastSeenAt = t.lastSeen or now -- the real last sighting, not the hold time of the tracker
     st.kind, st.cls = t.kind, cls
     st.name = t.name or st.name
     if dist and (not st.closest or dist < st.closest) then st.closest = dist end
