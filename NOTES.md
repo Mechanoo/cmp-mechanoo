@@ -24,3 +24,11 @@ Peripheral names and quirks found in the world. Add output of `peripherals` here
 - `velocity` is in blocks per tick: a player standing still showed y = -0.0784 (vanilla gravity per tick).
 - Two different SABLE ids appeared (open: two ships, or one ship that got a new id after reassembly?).
 - cannon_mount getInfo while not assembled: assembled=false, computerControl=false, yaw=90, pitch=0, shaft speeds 0.
+
+## Probe report 3 (singleplayer, one ship disassembled and reassembled at about 40 s)
+- A Sable ship gets a NEW id when it is disassembled and assembled again (19b3... seen 0-37 s, then 8c98... from 41 s).
+- The id stays the same while the ship exists, also after flying out of radar range and back (8c98..., gap 9 s).
+- The player id stayed the same for the whole run (40/40 equal to the detector uuid).
+- A third SABLE id was seen in every sample by exactly one radar and never moved (unknown object, to be identified).
+- Gaps: moving targets near the radar cluster had gaps up to 9 s; the stationary object had none. Target hold time should be at least ~10 s.
+- CC:Sable on a computer ON a ship: `sublevel.getUniqueId()`, `getName()`, `setName()`, poses and velocity. A ship computer can read its own current id.
