@@ -135,4 +135,18 @@ t.eq(types(ev), "visit_end", "only the player visit ends")
 t.eq(ev[1].target.cls, "trusted", "trusted visit recorded")
 t.eq(#policy.closeAll(policy.new()), 0, "closeAll on empty")
 
+-- base level
+local psL = policy.new()
+local function lvl(targets, now2)
+  local dd = policy.update(psL, now2, targets, ls, zone)
+  return policy.level(psL, dd, targets, zone)
+end
+t.eq(lvl({}, 0).label, "CLEAR", "nothing -> CLEAR")
+t.eq(lvl({ target("m", "player", "Me", 0, 0) }, 1000).n, 1, "only trusted -> 1")
+t.eq(lvl({ target("w", "player", "Walker", 300, 0) }, 2000).label, "WATCH", "unknown far -> WATCH")
+t.eq(lvl({ target("w", "player", "Walker", 100, 0) }, 3000).label, "ELEVATED", "unknown within 128 -> ELEVATED")
+t.eq(lvl({ target("w", "player", "Walker", 10, 0) }, 4000).label, "HIGH", "countdown -> HIGH")
+t.eq(lvl({ target("w", "player", "Walker", 10, 0) }, 14000).label, "ENGAGE", "engaged -> ENGAGE")
+t.eq(lvl({ target("e", "player", "Enemy", 600, 0) }, 15000).n, 5, "hostile anywhere -> 5")
+
 t.finish("policy")

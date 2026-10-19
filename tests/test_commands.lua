@@ -109,28 +109,75 @@ out = run("nonsense")
 t.contains(out, "unknown command", "unknown command")
 
 ---------------------------------------------------------------- alerts
+local actx = { now = 1760882520000, baseName = "Void base", tz = 2, level = { n = 4, label = "HIGH" } }
 local q = alerts.queue()
-alerts.push(q, { type = "zone_enter", countdownMs = 10000,
-  target = { id = "u", kind = "player", name = "Steve", pos = { x = 1.4, y = 64, z = -2.6 }, dist = 3.2 } })
-alerts.push(q, { type = "takeover", from = "aaaaaaaa1", to = "bbbbbbbb2", list = "trusted", label = "Home" })
-alerts.push(q, { type = "new", id = "x" }) -- not reported
+local ch, game = alerts.push(q, { type = "zone_enter", countdownMs = 10000,
+  target = { id = "u", kind = "player", name = "Steve", cls = "unknown", pos = { x = 1.4, y = 64, z = -2.6 }, dist = 3.2 } }, actx)
+t.eq(ch, "alerts", "zone enter goes to alerts")
+t.contains(game, "NO-GO ZONE Steve", "in-game text")
+alerts.push(q, { type = "takeover", from = "aaaaaaaa1", to = "bbbbbbbb2", list = "trusted", label = "Home" }, actx)
+t.eq(alerts.push(q, { type = "new", id = "x" }, actx), nil, "new is not reported")
 local msgs = alerts.drain(q)
 t.eq(#msgs, 2, "one message per channel")
-t.eq(msgs[1][1], "alerts", "zone enter goes to alerts")
-t.contains(msgs[1][2], "NO-GO ZONE", "zone text")
-t.contains(msgs[1][2], "(1, 64, -3)", "rounded position")
-t.contains(msgs[1][2], "10s", "countdown in text")
+local e = msgs[1][2].embeds[1]
+t.eq(msgs[1][1], "alerts", "alerts first")
+t.eq(e.title, "NO-GO ZONE: Steve", "title")
+t.eq(e.color, alerts.COLOR.orange, "orange")
+t.contains(e.description, "`1, 64, -3`", "rounded position")
+t.contains(e.description, "<t:1760882520:t> (16:02 UTC+2)", "time in Discord and in UTC+2")
+t.contains(e.description, "<t:1760882530:R>", "live countdown to firing")
+t.contains(e.description, "Base level: **4 HIGH**", "base level")
+t.contains(e.description, "`trust Steve`", "command hint")
+t.eq(e.timestamp, "2025-10-19T14:02:00Z", "embed timestamp")
+t.eq(e.footer.text, "Void base", "footer")
 t.eq(msgs[2][1], "log", "takeover goes to log")
-t.contains(msgs[2][2], "'Home'", "label in takeover")
+t.contains(msgs[2][2].embeds[1].description, "'Home'", "label in takeover")
 t.eq(#alerts.drain(q), 0, "queue empty after drain")
-for i = 1, 100 do
-  alerts.push(q, { type = "detected", target = { id = "p" .. i, kind = "player", name = "Player" .. i, pos = { x = i, y = 0, z = 0 } } })
+
+-- visitor with end time and live countdown
+local _, ve = alerts.format({ type = "list_change", text = "Bob is a visitor", who = "Bob", list = "visitor",
+  expires = actx.now + 45 * 60000 }, actx)
+t.eq(ve.title, "VISITOR: Bob", "visitor title")
+t.contains(ve.description, "16:47 UTC+2", "until time")
+t.contains(ve.description, "<t:" .. math.floor((actx.now + 45 * 60000) / 1000) .. ":R>", "live countdown")
+
+-- without a timezone only the Discord time
+local _, ne = alerts.format({ type = "detected", visit = 3,
+  target = { id = "u", kind = "player", name = "Steve", cls = "unknown" } }, { now = actx.now })
+t.eq(ne.title, "CONTACT: Steve", "contact title")
+t.contains(ne.description, "Visit #3", "visit number")
+t.eq(ne.description:find("UTC", 1, true), nil, "no zone text without timezone")
+t.eq(ne.footer.text, "Void base", "default base name")
+local _, se = alerts.format({ type = "detected", target = { id = "8c98841d-xx", kind = "ship", cls = "unknown", label = nil } }, actx)
+t.eq(se.title, "CONTACT: ship 8c98841d", "ship title")
+t.contains(se.description, "`ship 8c98841d trust`", "ship hint")
+
+-- batching: at most 10 embeds per message, ASCII only
+for i = 1, 25 do
+  alerts.push(q, { type = "detected", target = { id = "p" .. i, kind = "player", name = "Player" .. i, cls = "unknown",
+    pos = { x = i, y = 0, z = 0 } } }, actx)
 end
 msgs = alerts.drain(q)
-t.truthy(#msgs >= 2, "long batches split")
-for _, m in ipairs(msgs) do t.truthy(#m[2] <= 1900, "each part short enough") end
+t.eq(#msgs, 3, "25 embeds -> 3 messages")
 for _, m in ipairs(msgs) do
-  t.eq(m[2]:find("[\128-\255]"), nil, "ASCII only")
+  t.truthy(#m[2].embeds <= 10, "max 10 embeds")
+  local json = textutils.serialiseJSON(m[2])
+  t.eq(json:find("[\128-\255]"), nil, "ASCII only")
 end
+
+-- visitor command text with the time zone, basename
+cfg.timeOffsetHours = 2
+out, r = run("visitor Dan 45m")
+t.contains(out, "until", "visitor until")
+t.contains(out, "UTC+2", "until in UTC+2")
+t.eq(r.events[1].expires, now + 45 * 60000, "event carries the end time")
+t.eq(r.events[1].who, "Dan", "event carries the name")
+out = run("players")
+t.contains(out, "Dan (until", "players shows until")
+out, r = run("basename Void Sky Fortress")
+t.truthy(r.configChanged, "basename saved")
+t.eq(cfg.baseName, "Void Sky Fortress", "base name")
+out = run("basename")
+t.contains(out, "usage", "basename needs text")
 
 t.finish("commands")

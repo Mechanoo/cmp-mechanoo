@@ -18,6 +18,7 @@ local Z = require("lib.zone")
 local D = require("lib.duration")
 local probe = require("lib.probe_core")
 local history = require("lib.history")
+local clock = require("lib.clock")
 
 local args = { ... }
 local AUTOSTART = "/startup/void_radar.lua"
@@ -62,6 +63,7 @@ local logLines = {}
 local devices = { radars = {}, detectors = {}, chat = nil, speaker = nil }
 local radarCenter
 local decisions = {}
+local level = nil
 local lastListsSave = 0
 local serviceDone = false
 
@@ -99,6 +101,9 @@ end
 
 local function log(text)
   pcall(logToFile, text)
+  if not headless and W >= 40 then
+    text = "[" .. clock.hm(os.epoch("utc"), cfg.timeOffsetHours) .. "] " .. text
+  end
   logLines[#logLines + 1] = text
   if #logLines > 200 then table.remove(logLines, 1) end
   if headless then
@@ -249,15 +254,23 @@ local function warnPlayer(name, text)
   end
 end
 
+local function alertCtx()
+  return { now = now(), baseName = cfg.baseName, tz = cfg.timeOffsetHours, level = level }
+end
+
 local function handle(ev)
+  local t0 = ev.target
+  if (ev.type == "detected" or ev.type == "hostile") and t0 and t0.kind == "player" and t0.name then
+    local h = history.get(hist, t0.name)
+    ev.visit = (h and h.visits or 0) + 1
+  end
   if ev.type == "visit_end" and history.record(hist, ev) then
     ev.visits = history.get(hist, ev.target.name).visits
     store.writeJson(HISTORY_FILE, history.data(hist))
     hist.dirty = false
   end
-  local ch = alerts.push(queue, ev)
-  local _, text = alerts.format(ev)
-  if text then log((ch == "alerts" and "! " or "  ") .. text:gsub("%*%*", ""):gsub("`", "")) end
+  local ch, game = alerts.push(queue, ev, alertCtx())
+  if game then log((ch == "alerts" and "! " or "  ") .. game) end
   local t = ev.target
   if ev.type == "zone_enter" then
     sound()
@@ -317,6 +330,10 @@ local function drawStatus()
     else label = tostring(t.category or "?"):lower() end
     local dist = cfg.zone and math.floor(Z.distance(cfg.zone, t.pos) + 0.5) or 0
     local extra = d.action == "warn" and (" " .. D.format(d.remainingMs)) or ""
+    if d.cls == "visitor" then
+      local e = t.kind == "player" and lists.player(ls, t.name, t.id) or ls.ships[t.id]
+      if e and e.expires then extra = " " .. D.format(e.expires - now()) end
+    end
     w.setCursorPos(1, line)
     w.setTextColor(COLOR[d.action] or colors.white)
     local inside = Z.contains(cfg.zone, t.pos)
@@ -350,7 +367,9 @@ local function cycle()
   end
   for _, ev in ipairs(lists.expire(ls, t)) do handle(ev) end
   local evs
-  decisions, evs = policy.update(ps, t, tracker.all(tr), ls, cfg.zone)
+  local all = tracker.all(tr)
+  decisions, evs = policy.update(ps, t, all, ls, cfg.zone)
+  level = policy.level(ps, decisions, all, cfg.zone)
   for _, ev in ipairs(evs) do handle(ev) end
   applyAlarm()
   saveLists()
@@ -406,7 +425,7 @@ local function inputLoop()
     term.redirect(root)
     local r = commands.run({ lists = ls, tracker = tr, config = cfg, now = now(), radarCenter = radarCenter, history = hist }, line)
     for _, l in ipairs(r.lines) do log(l) end
-    for _, ev in ipairs(r.events) do alerts.push(queue, ev) end
+    for _, ev in ipairs(r.events) do alerts.push(queue, ev, alertCtx()) end
     if r.configChanged then saveConfig() end
     saveLists()
     drawStatus()

@@ -46,11 +46,13 @@ t.eq(history.get(copy, "Steve").visits, 2, "survives JSON")
 -- Discord text
 local ev = visit("Steve", 0, 7, "unknown", true)
 ev.visits = 3
-local ch, text = alerts.format(ev)
+local ch, emb = alerts.format(ev, { now = base, tz = 2 })
+local text = emb.title .. "\n" .. emb.description
 t.eq(ch, "log", "visit summary goes to the log")
-t.contains(text, "<t:" .. math.floor(base / 1000) .. ":t>", "Discord timestamp (shows in local time)")
-t.contains(text, "7m00s", "duration")
-t.contains(text, "was in the no-go zone", "zone")
+t.eq(emb.title, "VISIT ENDED: Steve", "title")
+t.contains(text, "<t:" .. math.floor(base / 1000) .. ":t> (16:02 UTC+2)", "Discord time and own zone")
+t.contains(text, "(7m00s)", "duration")
+t.contains(text, "Was in the no-go zone", "zone")
 t.contains(text, "Visits so far: 3", "count")
 t.eq(alerts.format(visit("Me", 0, 5, "trusted")), nil, "trusted visits are not posted")
 

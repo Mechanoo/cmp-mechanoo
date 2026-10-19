@@ -13,6 +13,7 @@ local Z = require("lib.zone")
 local D = require("lib.duration")
 local V = require("lib.vec")
 local history = require("lib.history")
+local clock = require("lib.clock")
 
 local C = {}
 
@@ -30,6 +31,7 @@ C.HELP = {
   "zone radars [chunks]   centre on the radars",
   "history [name]     how often and when players were here",
   "timezone <hours>   e.g. timezone 2 for UTC+2",
+  "basename <text>    name of the base in Discord",
 }
 
 local function words(line)
@@ -80,7 +82,15 @@ end
 function C.run(ctx, line)
   local out = { lines = {}, events = {}, configChanged = false }
   local function say(s) out.lines[#out.lines + 1] = s end
-  local function changed(text) out.events[#out.events + 1] = { type = "list_change", text = text } end
+  local function changed(text, extra)
+    local ev = { type = "list_change", text = text }
+    for k, v in pairs(extra or {}) do ev[k] = v end
+    out.events[#out.events + 1] = ev
+  end
+  local off = ctx.config.timeOffsetHours
+  local function untilText(expires)
+    return clock.hm(expires, off) .. " " .. clock.tzName(off)
+  end
 
   local w = words(line or "")
   local cmd = (w[1] or ""):lower()
@@ -105,7 +115,8 @@ function C.run(ctx, line)
       local e = ls.players[k]
       local extra = ""
       if e.list == "visitor" then
-        extra = " (" .. D.format(e.expires - now) .. " left, then " .. (e.prev or "unknown") .. ")"
+        extra = " (until " .. untilText(e.expires) .. ", " .. D.format(e.expires - now) .. " left, then "
+          .. (e.prev or "unknown") .. ")"
       end
       say(("%-8s %s%s"):format(e.list, e.name, extra))
     end
@@ -126,8 +137,9 @@ function C.run(ctx, line)
         end
       end
       lists.setPlayer(ls, name, "visitor", now, ms)
-      say(name .. " is a visitor for " .. D.format(ms))
-      changed(name .. " is a visitor for " .. D.format(ms))
+      local text = name .. " is a visitor until " .. untilText(now + ms) .. " (" .. D.format(ms) .. ")"
+      say(text)
+      changed(text, { who = name, list = "visitor", expires = now + ms })
     elseif cmd == "forget" or cmd == "unknown" then
       if lists.setPlayer(ls, name, nil, now) then
         say(name .. " is unknown again")
@@ -183,8 +195,9 @@ function C.run(ctx, line)
         end
       end
       lists.setShip(ls, id, "visitor", now, ms, info)
-      say("ship " .. short .. " is a visitor for " .. D.format(ms))
-      changed("ship " .. short .. " is a visitor for " .. D.format(ms))
+      local text = "ship " .. short .. " is a visitor until " .. untilText(now + ms) .. " (" .. D.format(ms) .. ")"
+      say(text)
+      changed(text, { who = "ship " .. short, list = "visitor", expires = now + ms })
     elseif action == "forget" or action == "unknown" then
       lists.setShip(ls, id, nil, now)
       say("ship " .. short .. " is unknown again")
@@ -252,6 +265,16 @@ function C.run(ctx, line)
     say("times in " .. (off == 0 and "UTC" or ("UTC" .. (off > 0 and "+" or "") .. off)))
     local lines = w[2] and history.details(ctx.history, w[2], off) or history.summary(ctx.history, off, 30)
     for _, l in ipairs(lines) do say(l) end
+
+  elseif cmd == "basename" then
+    local text = table.concat(w, " ", 2)
+    if text == "" or #text > 32 or text:find("[^%w _%-']") then
+      say("usage: basename <name, up to 32 letters, digits, spaces>")
+      return out
+    end
+    cfg.baseName = text
+    out.configChanged = true
+    say("the base is called '" .. text .. "' in Discord now")
 
   elseif cmd == "timezone" then
     local n = tonumber(w[2])

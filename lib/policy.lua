@@ -47,11 +47,35 @@ function P.lost(ps, id, now)
   end
 end
 
-local function snapshot(t, cls, zone)
+local function snapshot(t, cls, zone, ls)
+  local e = t.kind == "ship" and ls and ls.ships[t.id] or nil
   return {
-    id = t.id, kind = t.kind, name = t.name, cls = cls,
+    id = t.id, kind = t.kind, name = t.name, cls = cls, label = e and e.label or nil,
     pos = V.copy(t.pos), dist = zone and Z.distance(zone, t.pos) or nil,
   }
+end
+
+P.LEVELS = { "CLEAR", "WATCH", "ELEVATED", "HIGH", "ENGAGE" }
+
+-- Overall base level from the decisions of one update:
+-- 5 ENGAGE (something is engaged), 4 HIGH (countdown running), 3 ELEVATED
+-- (unknown within the inner ring), 2 WATCH (unknown in range), 1 CLEAR.
+function P.level(ps, decisions, targets, zone)
+  local n = 1
+  local inner = ps.cfg.rings[#ps.cfg.rings]
+  for _, t in ipairs(targets) do
+    local d = decisions[t.id]
+    local l = 1
+    if d then
+      if d.action == "engage" then l = 5
+      elseif d.action == "warn" then l = 4
+      elseif d.action == "watch" then
+        l = (zone and inner and Z.distance(zone, t.pos) <= inner) and 3 or 2
+      end
+    end
+    if l > n then n = l end
+  end
+  return { n = n, label = P.LEVELS[n] }
 end
 
 local function visitEnd(id, st)
@@ -117,7 +141,7 @@ function P.update(ps, now, targets, ls, zone)
     end
 
     local function emit(type, extra)
-      local ev = { type = type, target = snapshot(t, cls, zone) }
+      local ev = { type = type, target = snapshot(t, cls, zone, ls) }
       for k, v in pairs(extra or {}) do ev[k] = v end
       events[#events + 1] = ev
     end

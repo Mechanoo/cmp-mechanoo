@@ -89,7 +89,10 @@ redstone = { setOutput = function(side, on) rsCalls[#rsCalls + 1] = { side, on }
 local posts = {}
 http = {
   post = function(url, body)
-    posts[#posts + 1] = { url = url, content = textutils.unserialiseJSON(body).content }
+    local payload = textutils.unserialiseJSON(body)
+    local parts = {}
+    for _, e in ipairs(payload.embeds or {}) do parts[#parts + 1] = e.title .. "\n" .. e.description end
+    posts[#posts + 1] = { url = url, content = table.concat(parts, "\n"), embeds = #(payload.embeds or {}) }
     return { getResponseCode = function() return 204 end, close = function() end }
   end,
 }
@@ -104,17 +107,21 @@ end
 local A, L = table.concat(alertsText, "\n"), table.concat(logText, "\n")
 
 t.contains(L, "Radar online on computer 7: 2 radar(s), 1 detector(s), zone 10x10 chunks", "online message")
-t.contains(A, "**Stranger** (unknown player) detected", "stranger detected")
-t.contains(A, "**Ghost** (unknown player) detected", "name of a radar-only player looked up by uuid")
-t.eq(A:find("name not known", 1, true), nil, "every player got a name")
+t.contains(A, "CONTACT: Stranger", "stranger detected")
+t.contains(A, "Visit #1", "visit number")
+t.contains(A, "Base level: **", "base level")
+t.contains(A, "CONTACT: Ghost", "name of a radar-only player looked up by uuid")
+t.eq(A:find("CONTACT: player ", 1, true), nil, "every player got a name")
 t.eq(A:find("minecraft:player", 1, true), nil, "the entity type is never used as a name")
 t.contains(A, "NO-GO ZONE", "stranger entered the zone")
-t.eq(A:find("within 128 blocks", 1, true), nil, "no ring alert when jumping straight into the zone")
-t.contains(A, "**ENGAGE** **Stranger** (unknown player)", "engaged after the countdown")
-t.contains(A, "**HOSTILE** **Enemy** (hostile player)", "hostile reported")
+t.eq(A:find("APPROACH: Stranger", 1, true), nil, "no ring alert when jumping straight into the zone")
+t.contains(A, "Base level: **5 ENGAGE**", "level 5 once something is engaged")
+t.contains(A, "ENGAGE: Stranger", "engaged after the countdown")
+t.contains(A, "HOSTILE: Enemy", "hostile reported")
 t.eq(A:find("Mechanoo", 1, true), nil, "trusted owner never reported")
-t.contains(L, "took over the list 'trusted'", "ship takeover logged")
-t.eq(A:find("ship `s-new`", 1, true), nil, "reassembled ship is not an alert")
+t.contains(L, "SHIP REASSEMBLED", "ship takeover logged")
+t.contains(L, "took over the list **trusted**", "takeover text")
+t.eq(A:find("s-new", 1, true), nil, "reassembled ship is not an alert")
 
 t.eq(#chatCalls, 1, "one chat warning")
 t.eq(chatCalls[1] and chatCalls[1].to, "Stranger", "warning to the stranger")
@@ -128,13 +135,13 @@ local saved = textutils.unserialiseJSON(readAll("/void-data/lists.json"))
 t.eq(saved.ships["s-new"] and saved.ships["s-new"].list, "trusted", "takeover saved")
 t.eq(saved.ships["s-new"] and saved.ships["s-new"].label, "Home", "label saved")
 t.eq(saved.players.mechanoo.uuid, "u-me", "uuid remembered")
-t.contains(L, "Visit of **Passerby** (unknown player) ended", "visit summary in the log")
+t.contains(L, "VISIT ENDED: Passerby", "visit summary in the log")
 t.contains(L, "Visits so far: 1", "visit count in the log")
-t.contains(L, "<t:1000:t> to <t:1002:t>, 2s,", "visit length without the hold time")
+t.contains(L, "From <t:1000:t> to <t:1002:t> (2s)", "visit length without the hold time")
 local hist = textutils.unserialiseJSON(readAll("/void-data/history.json"))
 t.eq(hist.players.passerby and hist.players.passerby.visits, 1, "history saved")
 local logText = readAll("/void-data/radar.log")
-t.contains(logText, "Stranger (unknown player) detected", "events written to radar.log")
+t.contains(logText, "CONTACT Stranger (unknown player)", "events written to radar.log")
 t.contains(logText, "1970-01-01 00:16:40 ", "UTC timestamp in radar.log")
 local rcfg = textutils.unserialiseJSON(readAll("/void-data/radar.json"))
 t.eq(rcfg.zone and rcfg.zone.x1, -80, "zone created around the radars")
