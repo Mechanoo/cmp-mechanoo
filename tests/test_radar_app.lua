@@ -47,7 +47,7 @@ local function tracks()
   end
   if s >= 1 and s < 2 then -- ghost objects for one sample, like after a chunk load
     for g = 1, 6 do
-      list[#list + 1] = { id = "ghost-" .. g, category = "SABLE", entityType = "Sable:ship", position = { x = g, y = 70, z = 0 }, velocity = { x = 0, y = 0, z = 0 } }
+      list[#list + 1] = { id = "ghost-" .. g, category = "SABLE", entityType = "Sable:ship", position = { x = 30 + g, y = 70, z = -30 }, velocity = { x = 0, y = 0, z = 0 } }
     end
   end
   list[#list + 1] = { id = "u-ghost", category = "PLAYER", entityType = "entity.minecraft.player", position = { x = 150, y = 64, z = 150 }, velocity = { x = 0, y = 0, z = 0 } }
