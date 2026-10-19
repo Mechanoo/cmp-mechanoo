@@ -14,7 +14,7 @@ States: idea / in progress / tested in game
 | 5b | Radar map on monitor / DirectGPU | idea |
 | 6 | Player detector | merged into 5 |
 | 7 | Cannon calculator | idea |
-| 8 | Shop / bank (Numismatics) | idea |
+| 8 | Shop / bank (Numismatics) | dropped (Numismatics machines disabled on CMP since v1.24.0) |
 | 9 | Radar auto-targeting | idea |
 | 10 | Airship autopilot | idea |
 | 11 | Turtle miner | idea |
