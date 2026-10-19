@@ -72,75 +72,147 @@ end
 
 local g = mockGpu()
 local view = V.new(g, 7, { pixelWidth = 640, pixelHeight = 384 }, {})
-V.draw(view, m)
-local all = {}
-for _, x in ipairs(g.texts) do all[#all + 1] = x.str end
-local joined = table.concat(all, "\n")
-t.contains(joined, "LEVEL", "banner shows the level")
-t.contains(joined, "Void test", "banner shows the base name")
-t.contains(joined, "TARGETS", "list header")
-t.contains(joined, "Steve", "player in the list")
-t.contains(joined, "EVENTS", "log header")
-t.contains(joined, "CONTACT Steve", "log line")
-t.contains(joined, "VISITORS", "stats header")
-t.contains(joined, "2x 20m00s", "Steve: 2 visits, 20 min in total")
+local function frame(mm)
+  g.texts = {}
+  V.draw(view, mm or V.model(args))
+  local all = {}
+  for _, x in ipairs(g.texts) do all[#all + 1] = x.str end
+  return table.concat(all, "\n")
+end
+local function tap(h) return V.click(view, h.x + 2, h.y + 2, NOW) end
+local function findHit(pred)
+  for _, h in ipairs(view.hits) do if pred(h) then return h end end
+end
+
+-- radar page (default)
+local joined = frame()
+t.eq(view.page, "radar", "starts on the radar page")
+t.contains(joined, "LEVEL", "status bar shows the level")
+t.contains(joined, "Void test", "status bar shows the base name")
+t.contains(joined, "RADAR", "tab bar")
+t.contains(joined, "TARGETS", "tab bar: targets")
+t.contains(joined, "NEAREST", "radar page: nearest list")
+t.contains(joined, "Steve", "radar page: player")
+t.contains(joined, "N", "compass")
 local inside = true
 for _, x in ipairs(g.texts) do
-  if x.x < 0 or x.y < 0 or x.x > 640 or x.y > 384 then inside = false end
+  if x.x < -1 or x.y < -1 or x.x > 640 or x.y > 384 then inside = false end
 end
 t.truthy(inside, "all text starts inside the display")
-t.truthy(#view.hits >= 4, "targets are touchable")
+t.truthy(#view.hits >= 9, "tabs and targets are touchable")
+-- the level 4+ jump is not triggered by a calm radar
+t.eq(view.lastLevel, level and level.n or 0, "level remembered")
 
--- tap on the list row of Steve selects it and shows the detail panel
-local hitSteve
-for _, h in ipairs(view.hits) do if h.kind == "target" and h.id == steve.id and h.x >= 358 then hitSteve = h end end
-t.truthy(hitSteve, "list row of Steve is a hit area")
-local act, changed = V.click(view, hitSteve.x + 2, hitSteve.y + 2, NOW)
-t.eq(act, nil, "selecting is no command")
+-- tabs
+local function gotoTab(id)
+  local h = findHit(function(x) return x.kind == "tab" and x.page == id end)
+  t.truthy(h, "tab " .. id .. " is a hit area")
+  tap(h)
+  t.eq(view.page, id, "tab " .. id .. " active")
+  return frame()
+end
+joined = gotoTab("targets")
+t.contains(joined, "NAME", "targets table header")
+t.contains(joined, "Steve", "targets table row")
+t.contains(joined, "unknown", "targets table: list column")
+joined = gotoTab("visitors")
+t.contains(joined, "TOTAL TIME", "visitors table header")
+t.contains(joined, "Steve", "visitors: Steve")
+t.contains(joined, "20m00s", "visitors: Steve total time")
+t.contains(joined, "Bob", "visitors: Bob")
+joined = gotoTab("events")
+t.contains(joined, "CONTACT Steve", "events page: log line")
+joined = gotoTab("control")
+t.contains(joined, "MUTE SIREN 10m", "control: mute button")
+t.contains(joined, "Siren: on", "control: siren state")
+
+-- control buttons run commands and keep the page
+local mute = findHit(function(h) return h.kind == "cmd" and h.cmd == "alarm mute 10m" end)
+local action = tap(mute)
+t.eq(action and action.cmd, "alarm mute 10m", "mute button returns its command")
+t.eq(view.page, "control", "stays on the control page")
+local volDown = findHit(function(h) return h.kind == "cmd" and h.cmd == "alarm volume 2" end)
+t.truthy(volDown, "volume - from 3 asks for 2")
+
+-- events scrolling
+for i = 1, 40 do args.log[#args.log + 1] = "[12:" .. i .. "]   filler " .. i end
+gotoTab("events")
+local up = findHit(function(h) return h.kind == "scroll" and h.delta > 0 end)
+tap(up)
+t.eq(view.logScroll, 5, "UP scrolls back in the log")
+joined = frame()
+t.contains(joined, "newer", "scroll position shown")
+local down = findHit(function(h) return h.kind == "scroll" and h.delta < 0 end)
+tap(down)
+tap(down)
+t.eq(view.logScroll, 0, "DOWN stops at the newest line")
+for i = 1, 40 do args.log[#args.log] = nil end
+
+-- targets: tap a row -> card with buttons
+gotoTab("targets")
+local row = findHit(function(h) return h.kind == "target" and h.id == steve.id end)
+t.truthy(row, "row of Steve is a hit area")
+tap(row)
 t.eq(view.selected, steve.id, "Steve selected")
-g.texts = {}
-V.draw(view, m)
-all = {}
-for _, x in ipairs(g.texts) do all[#all + 1] = x.str end
-joined = table.concat(all, "\n")
-t.contains(joined, "TRUST", "detail: trust button")
-t.contains(joined, "HOSTILE", "detail: hostile button")
-t.contains(joined, "2 visits, 20m00s total", "detail: visit stats")
-t.contains(joined, "IN ZONE", "detail: zone flag")
-local trust
-for _, h in ipairs(view.hits) do if h.kind == "cmd" and h.cmd == "trust Steve" then trust = h end end
+joined = frame()
+t.contains(joined, "TRUST", "card: trust button")
+t.contains(joined, "HOSTILE", "card: hostile button")
+t.contains(joined, "2 visits, 20m00s total", "card: visit stats")
+t.contains(joined, "IN ZONE", "card: zone flag")
+local trust = findHit(function(h) return h.kind == "cmd" and h.cmd == "trust Steve" end)
 t.truthy(trust, "trust button maps to 'trust Steve'")
-local act2 = V.click(view, trust.x + 1, trust.y + 1, NOW)
+local act2 = tap(trust)
 t.eq(act2 and act2.cmd, "trust Steve", "tap on TRUST returns the command")
 t.eq(view.selected, nil, "selection cleared after a command")
-
--- the command really changes the list
-local ctx = { lists = ls, tracker = tr, config = cfg, now = NOW }
-commands.run(ctx, act2.cmd)
+commands.run({ lists = ls, tracker = tr, config = cfg, now = NOW }, act2.cmd)
 t.eq(lists.player(ls, "Steve").list, "trusted", "command from the screen trusts Steve")
+
+-- radar page: tap on a blip selects, BACK clears
+gotoTab("radar")
+local blip = findHit(function(h) return h.kind == "target" and h.id == steve.id and h.x < 640 * 0.6 end)
+t.truthy(blip, "Steve's blip on the scope is touchable")
+tap(blip)
+t.eq(view.selected, steve.id, "blip selects")
+frame()
+local back = findHit(function(h) return h.kind == "back" end)
+tap(back)
+t.eq(view.selected, nil, "BACK clears the selection")
 
 -- a ship gets ship commands
 local shipT
 for _, x in ipairs(m.targets) do if x.id == "8c98841d-1a03" then shipT = x end end
 view.selected, view.selectedAt = shipT.id, NOW
-V.draw(view, V.model(args))
-local shipCmd
-for _, h in ipairs(view.hits) do if h.kind == "cmd" and h.cmd:find("^ship 8c98841d hostile") then shipCmd = h end end
-t.truthy(shipCmd, "ship buttons use 'ship <id> ...'")
--- back button
-local back
-for _, h in ipairs(view.hits) do if h.kind == "back" then back = h end end
-V.click(view, back.x + 1, back.y + 1, NOW)
-t.eq(view.selected, nil, "BACK clears the selection")
+frame()
+t.truthy(findHit(function(h) return h.kind == "cmd" and h.cmd == "ship 8c98841d hostile" end), "ship buttons use 'ship <id> ...'")
 -- selection times out
 view.selected, view.selectedAt = shipT.id, NOW - V.SELECT_TIMEOUT_MS - 1
-V.draw(view, V.model(args))
+frame()
 t.eq(view.selected, nil, "selection times out")
+
+-- visitors: tap a name -> history card
+gotoTab("visitors")
+local bobHit = findHit(function(h) return h.kind == "player" and h.name == "Bob" end)
+tap(bobHit)
+joined = frame()
+t.contains(joined, "1 visit, 1m40s total", "player card: totals")
+t.truthy(findHit(function(h) return h.kind == "cmd" and h.cmd == "hostile Bob" end), "player card: hostile Bob")
+
+-- level 4+ jumps back to the radar page
+gotoTab("events")
+local hot = V.model(args)
+hot.level = { n = 4, label = "WARNING" }
+view.lastLevel = 1
+frame(hot)
+t.eq(view.page, "radar", "a rising alarm level switches to the radar page")
 
 -- empty radar and no zone must not crash
 local empty = V.model({ now = NOW, cfg = {}, tracker = tracker.new(), decisions = {}, lists = lists.new(), history = nil, level = nil, log = {} })
-V.draw(view, empty)
-t.truthy(true, "empty model draws")
+for _, p in ipairs(V.TABS) do
+  view.page = p.id
+  frame(empty)
+end
+t.truthy(true, "empty model draws on every page")
+view.page = "radar"
 
 -- controller: attach, draw, touch, errors
 local real = peripheral
@@ -172,9 +244,9 @@ local ups = 0
 for _, c in ipairs(gpu2.calls) do if c[1] == "updateDisplay" then ups = ups + 1 end end
 t.eq(ups, 1, "one updateDisplay per frame")
 -- touch event on a list row selects, second on TRUST runs the command
-local row
-for _, h in ipairs(ctrl.view.hits) do if h.kind == "target" and h.x >= 358 then row = h break end end
-gpu2.events[1] = { type = "mouse_click", x = row.x + 2, y = row.y + 2 }
+local rowHit
+for _, h in ipairs(ctrl.view.hits) do if h.kind == "target" then rowHit = h break end end
+gpu2.events[1] = { type = "mouse_click", x = rowHit.x + 2, y = rowHit.y + 2 }
 S.step(ctrl)
 t.truthy(ctrl.view.selected, "touch selects a target")
 local btn

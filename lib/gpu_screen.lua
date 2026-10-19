@@ -74,6 +74,7 @@ end
 local function draw(s)
   local v = s.view
   local m = view.model(s.deps.args())
+  view.prepare(v, m)
   local sig = view.signature(m, v)
   if sig == s.sig then return end
   s.sig = sig
