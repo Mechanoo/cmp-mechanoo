@@ -9,4 +9,4 @@ Peripheral names and quirks found in the world. Add output of `peripherals` here
 - The track `id` of a player is a UUID (looks like the Minecraft UUID) and stayed the same for the whole measurement. A Sable ship id is a UUID too and came back unchanged after gaps.
 - A radar track position matches the player detector position of the same player (0.0 blocks apart).
 - Tracks flicker: each plane radar only reports a target in some samples (average 0.3 to 0.7 tracks per sample for 1 target). Programs must keep a target alive for a few seconds after its last sighting.
-- `getRange()` returned 250 on all four plane radars (the changelog says 512, to be verified).
+- `getRange()` returned 250 on all four plane radars. That was a singleplayer test world with the mod default config; the server runs 512 (changelog v0.11.0). In singleplayer the vertical scan range is only 20 blocks.
