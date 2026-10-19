@@ -292,10 +292,11 @@ local function applyAlarm()
 end
 
 ---------------------------------------------------------------- screen drawing
-local ORDER = { engage = 1, warn = 2, watch = 3, friendly = 4, ignore = 5 }
-local SHORT = { engage = "ENG", warn = "WARN", watch = "SEEN", friendly = "OK", ignore = "--" }
+local ORDER = { engage = 1, warn = 2, watch = 3, friendly = 4, pending = 5, ignore = 6 }
+local SHORT = { engage = "ENG", warn = "WARN", watch = "SEEN", friendly = "OK", pending = "?", ignore = "--" }
 local NARROW = W < 40
-local COLOR = { engage = colors.red, warn = colors.orange, watch = colors.yellow, friendly = colors.lime, ignore = colors.gray }
+local COLOR = { engage = colors.red, warn = colors.orange, watch = colors.yellow, friendly = colors.lime,
+  pending = colors.lightGray, ignore = colors.gray }
 
 local function drawStatus()
   if headless then return end

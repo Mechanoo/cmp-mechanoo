@@ -31,10 +31,14 @@ t.eq(tr.targets["u1"].pos.x, 10.2, "detector position wins")
 t.eq(tr.targets["u1"].vel.x, 0.5, "radar velocity kept")
 t.eq(tr.targets["ship1"].kind, "ship", "SABLE is a ship")
 
+t.eq(tr.targets["u1"].sightings, 1, "one sighting per update, even with two radars and the detector")
+
 -- radar-only sighting keeps the name
 now = now + 1000
 tracker.update(tr, now, { trk("u1", "PLAYER", 12, 64, 10) }, {}, ls)
 t.eq(tr.targets["u1"].name, "Bob", "name remembered for radar-only sightings")
+
+t.eq(tr.targets["u1"].sightings, 2, "second update counts")
 
 -- detector-only: velocity from movement (blocks per tick). 1 s = 20 ticks, moved 20 blocks -> 1 block/tick
 now = now + 1000

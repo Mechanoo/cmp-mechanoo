@@ -9,6 +9,11 @@
 -- Escort rule: an unknown ship with a trusted or visitor player within
 -- escortDist is treated as friendly (a friend flying an unlisted ship).
 --
+-- Confirmation: radars report ghost objects for a single sample while chunks
+-- load (measured: six unknown ships at once, each seen once). An unknown target
+-- that the detector does not know by name must be seen in confirmSightings
+-- updates before it causes alerts, a countdown or a visit record ("pending").
+--
 -- Visits: a visit starts when a player or ship shows up and ends when it has
 -- been gone for visitGapMs. Shorter gaps (radar flicker, edge of range) belong
 -- to the same visit. Every visit is announced; its end is reported with a
@@ -24,6 +29,7 @@ P.DEFAULTS = {
   rings = { 256, 128 },
   escortDist = 8,
   visitGapMs = 60000,
+  confirmSightings = 2,
 }
 
 function P.new(cfg)
@@ -78,6 +84,12 @@ function P.level(ps, decisions, targets, zone)
   return { n = n, label = P.LEVELS[n] }
 end
 
+local function confirmed(t, cls, cfg)
+  if cls ~= "unknown" then return true end          -- listed targets are known
+  if t.kind == "player" and t.name then return true end -- the detector knows the name
+  return t.sightings == nil or t.sightings >= cfg.confirmSightings
+end
+
 local function visitEnd(id, st)
   return {
     type = "visit_end",
@@ -90,7 +102,7 @@ end
 function P.closeAll(ps)
   local events = {}
   for id, st in pairs(ps.per) do
-    if st.kind ~= "other" then events[#events + 1] = visitEnd(id, st) end
+    if st.kind ~= "other" and st.confirmed then events[#events + 1] = visitEnd(id, st) end
   end
   ps.per = {}
   return events
@@ -104,8 +116,10 @@ function P.update(ps, now, targets, ls, zone)
 
   for id, st in pairs(ps.per) do
     if st.lostAt and now - st.lostAt > cfg.visitGapMs then
-      if st.kind ~= "other" then events[#events + 1] = visitEnd(id, st) end
+      if st.kind ~= "other" and st.confirmed then events[#events + 1] = visitEnd(id, st) end
       ps.per[id] = nil
+    elseif st.lostAt and not st.confirmed then
+      ps.per[id] = nil -- a ghost: forget it at once
     end
   end
 
@@ -146,8 +160,12 @@ function P.update(ps, now, targets, ls, zone)
       events[#events + 1] = ev
     end
 
+    if cls ~= "other" and not st.confirmed then st.confirmed = confirmed(t, cls, cfg) end
+
     if cls == "other" then
       decisions[t.id] = { action = "ignore", cls = cls }
+    elseif not st.confirmed then
+      decisions[t.id] = { action = "pending", cls = cls }
     elseif cls == "trusted" or cls == "visitor" or escorted then
       if st.zoneSince then emit("zone_cleared") end
       st.zoneSince, st.engaged, st.hostileSeen = nil, false, false

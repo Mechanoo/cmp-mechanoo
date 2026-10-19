@@ -147,6 +147,11 @@ function T.update(tr, now, tracks, players, ls)
   end
 
   for id in pairs(seen) do
+    local t = tr.targets[id]
+    t.sightings = (t.sightings or 0) + 1 -- updates in which the target was really seen
+  end
+
+  for id in pairs(seen) do
     local e = ls.ships[id]
     local t = tr.targets[id]
     if e and t.kind == "ship" then

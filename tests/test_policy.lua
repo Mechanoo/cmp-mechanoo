@@ -135,6 +135,42 @@ t.eq(types(ev), "visit_end", "only the player visit ends")
 t.eq(ev[1].target.cls, "trusted", "trusted visit recorded")
 t.eq(#policy.closeAll(policy.new()), 0, "closeAll on empty")
 
+-- confirmation: a ghost ship seen once causes nothing
+local psG = policy.new()
+local ghost = target("g", "ship", nil, 10, 10)
+ghost.sightings = 1
+d, ev = policy.update(psG, 0, { ghost }, ls, zone)
+t.eq(d.g.action, "pending", "ship seen once is pending")
+t.eq(#ev, 0, "no alert for a single sighting")
+policy.lost(psG, "g", 10000)
+d, ev = policy.update(psG, 80000, {}, ls, zone)
+t.eq(#ev, 0, "no visit record for a ghost")
+t.eq(psG.per.g, nil, "ghost forgotten")
+-- a real ship: second sighting confirms it, the countdown starts then
+local real = target("r", "ship", nil, 10, 10)
+real.sightings = 1
+d, ev = policy.update(psG, 100000, { real }, ls, zone)
+t.eq(d.r.action, "pending", "first sighting pending")
+real.sightings = 2
+d, ev = policy.update(psG, 103000, { real }, ls, zone)
+t.eq(types(ev), "detected,zone_enter", "confirmed on the second sighting")
+t.eq(d.r.remainingMs, 10000, "countdown starts at confirmation")
+-- a named player is confirmed at once, a radar-only unnamed player is not
+local named = target("n", "player", "Named", 10, 10)
+named.sightings = 1
+local nameless = target("x", "player", nil, 10, 10)
+nameless.sightings = 1
+d, ev = policy.update(psG, 104000, { named, nameless }, ls, zone)
+t.eq(d.n.action, "warn", "named player counts at once")
+t.eq(d.x.action, "pending", "nameless radar player waits")
+-- a listed hostile ship is engaged at the first sighting
+lists.setShip(ls, "h", "hostile", 0)
+local hs = target("h", "ship", nil, 400, 0)
+hs.sightings = 1
+d = policy.update(psG, 105000, { hs }, ls, zone)
+t.eq(d.h.action, "engage", "listed hostile ship needs no confirmation")
+t.eq(policy.level(psG, { g = { action = "pending" } }, { ghost }, zone).n, 1, "pending does not raise the level")
+
 -- base level
 local psL = policy.new()
 local function lvl(targets, now2)

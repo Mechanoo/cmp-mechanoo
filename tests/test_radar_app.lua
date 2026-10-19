@@ -45,6 +45,11 @@ local function tracks()
   elseif s >= 7 then
     list[#list + 1] = { id = "s-new", category = "SABLE", entityType = "Sable:ship", position = { x = 12, y = 70, z = 10 }, velocity = { x = 0, y = 0, z = 0 } }
   end
+  if s >= 1 and s < 2 then -- ghost objects for one sample, like after a chunk load
+    for g = 1, 6 do
+      list[#list + 1] = { id = "ghost-" .. g, category = "SABLE", entityType = "Sable:ship", position = { x = g, y = 70, z = 0 }, velocity = { x = 0, y = 0, z = 0 } }
+    end
+  end
   list[#list + 1] = { id = "u-ghost", category = "PLAYER", entityType = "entity.minecraft.player", position = { x = 150, y = 64, z = 150 }, velocity = { x = 0, y = 0, z = 0 } }
   return list
 end
@@ -123,6 +128,8 @@ t.eq(A:find("Mechanoo", 1, true), nil, "trusted owner never reported")
 t.contains(L, "SHIP REASSEMBLED", "ship takeover logged")
 t.contains(L, "took over the list **trusted**", "takeover text")
 t.eq(A:find("s-new", 1, true), nil, "reassembled ship is not an alert")
+t.eq(A:find("ghost-", 1, true), nil, "one-sample ghost ships cause no alert")
+t.eq(L:find("ghost-", 1, true), nil, "and no visit record")
 
 t.eq(#chatCalls, 1, "one chat warning")
 t.eq(chatCalls[1] and chatCalls[1].to, "Stranger", "warning to the stranger")
