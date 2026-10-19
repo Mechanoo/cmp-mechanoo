@@ -1,5 +1,5 @@
 {
- "version": "432116ba0a",
+ "version": "c6ef670f0b",
  "files": [
   {
    "path": "apps/discord-test/main.lua",
@@ -27,7 +27,7 @@
   },
   {
    "path": "lib/commands.lua",
-   "size": 10492
+   "size": 10894
   },
   {
    "path": "lib/discord.lua",

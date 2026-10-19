@@ -32,6 +32,7 @@ C.HELP = {
   "history [name]     how often and when players were here",
   "timezone <hours>   e.g. timezone 2 for UTC+2",
   "basename <text>    name of the base in Discord",
+  "detectrange <blocks>   player detector range (default 512)",
 }
 
 local function words(line)
@@ -265,6 +266,16 @@ function C.run(ctx, line)
     say("times in " .. (off == 0 and "UTC" or ("UTC" .. (off > 0 and "+" or "") .. off)))
     local lines = w[2] and history.details(ctx.history, w[2], off) or history.summary(ctx.history, off, 30)
     for _, l in ipairs(lines) do say(l) end
+
+  elseif cmd == "detectrange" then
+    local n = tonumber(w[2])
+    if not n or n < 16 or n > 512 or n % 1 ~= 0 then
+      say("usage: detectrange <16-512>, now " .. tostring(cfg.detectRange or 512))
+      return out
+    end
+    cfg.detectRange = n
+    out.configChanged = true
+    say("player detector range is " .. n .. " blocks now")
 
   elseif cmd == "basename" then
     local text = table.concat(w, " ", 2)

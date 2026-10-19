@@ -16,7 +16,7 @@ end
 fs.delete("/void-data")
 writeAll("/void-data/discord.json", textutils.serialiseJSON({
   alerts = "https://discord.com/api/webhooks/1/a", log = "https://discord.com/api/webhooks/2/b" }))
-writeAll("/void-data/radar.json", textutils.serialiseJSON({ alarmSide = "top" }))
+writeAll("/void-data/radar.json", textutils.serialiseJSON({ alarmSide = "top", detectRange = 300 }))
 writeAll("/void-data/lists.json", textutils.serialiseJSON({
   players = { mechanoo = { name = "Mechanoo", list = "trusted" }, enemy = { name = "Enemy", list = "hostile" } },
   ships = { ["s-old"] = { id = "s-old", list = "trusted", label = "Home", lastPos = { x = 10, y = 70, z = 10 }, lastSeen = 0 } },
@@ -49,7 +49,7 @@ local function tracks()
   return list
 end
 
-local chatCalls, soundCalls, rsCalls = {}, 0, {}
+local chatCalls, soundCalls, rsCalls, rangesAsked = {}, 0, {}, {}
 local P = {
   r0 = { types = { "create_radar:plane_radar" }, methods = { "getTracks", "getPosition", "getRange" } },
   r1 = { types = { "create_radar:plane_radar" }, methods = { "getTracks", "getPosition", "getRange" } },
@@ -67,6 +67,7 @@ peripheral = {
     if m == "getRange" then return 250 end
     if m == "getTracks" then return n == "r0" and tracks() or {} end
     if m == "getPlayersInRange" then
+      rangesAsked[#rangesAsked + 1] = a[1]
       local names = {}
       for _, p in ipairs(players()) do names[#names + 1] = p.name end
       return names
@@ -131,6 +132,7 @@ local sawOn = false
 for _, c in ipairs(rsCalls) do if c[1] == "top" and c[2] == true then sawOn = true end end
 t.truthy(sawOn, "redstone alarm on")
 
+t.eq(rangesAsked[1], 300, "configured detector range is used")
 local saved = textutils.unserialiseJSON(readAll("/void-data/lists.json"))
 t.eq(saved.ships["s-new"] and saved.ships["s-new"].list, "trusted", "takeover saved")
 t.eq(saved.ships["s-new"] and saved.ships["s-new"].label, "Home", "label saved")
