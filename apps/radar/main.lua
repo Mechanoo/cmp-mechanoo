@@ -80,7 +80,25 @@ if not headless then
   inputWin = window.create(root, 1, H, W, 1)
 end
 
+-- Everything shown in the log area also goes to /void-data/radar.log (UTC times),
+-- so it can be read later. The file is rotated at about 100 KB.
+local LOG_FILE = fs.combine(store.DIR, "radar.log")
+local logWrites = 0
+local function logToFile(text)
+  logWrites = logWrites + 1
+  if logWrites % 50 == 0 and fs.exists(LOG_FILE) and fs.getSize(LOG_FILE) > 100000 then
+    fs.delete(LOG_FILE .. ".1")
+    fs.move(LOG_FILE, LOG_FILE .. ".1")
+  end
+  local h = fs.open(LOG_FILE, "a")
+  if h then
+    h.writeLine(os.date("!%Y-%m-%d %H:%M:%S ", math.floor(os.epoch("utc") / 1000)) .. text)
+    h.close()
+  end
+end
+
 local function log(text)
+  pcall(logToFile, text)
   logLines[#logLines + 1] = text
   if #logLines > 200 then table.remove(logLines, 1) end
   if headless then
