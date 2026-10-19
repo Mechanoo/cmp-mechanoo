@@ -1,5 +1,6 @@
 -- Runs the real radar app for 16 cycles against mocked devices and a fake clock.
 local t = require("tests.t")
+local lockDuringSiren = false
 
 local function readAll(path)
   local h = fs.open(path, "r")
@@ -89,7 +90,7 @@ peripheral = {
     end
     if m == "sendMessageToPlayer" then chatCalls[#chatCalls + 1] = { msg = a[1], to = a[2] } return true end
     if m == "playSound" then soundCalls = soundCalls + 1 soundNames[#soundNames + 1] = a[1] return true end
-    if m == "playAudio" then audioCalls[#audioCalls + 1] = a[1] return true end
+    if m == "playAudio" then audioCalls[#audioCalls + 1] = a[1] lockDuringSiren = lockDuringSiren or require("lib.audiolock").held() return true end
   end,
 }
 redstone = { setOutput = function(side, on) rsCalls[#rsCalls + 1] = { side, on } end }
@@ -137,6 +138,8 @@ t.eq(#chatCalls, 0, "no chat messages to players")
 t.truthy(soundCalls >= 2, "bell for new contacts")
 t.eq(soundNames[1], "minecraft:block.bell.use", "bell sound")
 t.truthy(#audioCalls >= 1, "siren audio played")
+t.truthy(lockDuringSiren, "speakers are claimed while the siren plays")
+t.eq(require("lib.audiolock").held(), false, "claim released when the radar stops")
 local buf = audioCalls[1] or {}
 t.eq(#buf, 48000, "siren buffer is 1 s at 48 kHz")
 local okRange = true

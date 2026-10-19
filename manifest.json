@@ -1,9 +1,13 @@
 {
- "version": "4bf17b051c",
+ "version": "2daa2a9c87",
  "files": [
   {
    "path": "apps/discord-test/main.lua",
    "size": 1256
+  },
+  {
+   "path": "apps/music/main.lua",
+   "size": 21043
   },
   {
    "path": "apps/probe/main.lua",
@@ -11,7 +15,7 @@
   },
   {
    "path": "apps/radar/main.lua",
-   "size": 19359
+   "size": 19786
   },
   {
    "path": "bin/void.lua",
@@ -20,6 +24,10 @@
   {
    "path": "lib/alerts.lua",
    "size": 8514
+  },
+  {
+   "path": "lib/audiolock.lua",
+   "size": 847
   },
   {
    "path": "lib/clock.lua",

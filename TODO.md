@@ -18,4 +18,5 @@ States: idea / in progress / tested in singleplayer / tested on server
 | 4 | Train schedule display | idea |
 | 11 | Turtle miner | idea |
 | 6 | Player detector | merged into 5 |
+| 13 | Music player (`void music`, terreng's streaming-music with siren priority) | in progress, not yet tested in game |
 | 8 | Shop / bank (Numismatics) | dropped (Numismatics machines disabled on CMP since v1.24.0) |

@@ -21,6 +21,7 @@ local probe = require("lib.probe_core")
 local history = require("lib.history")
 local clock = require("lib.clock")
 local siren = require("lib.siren")
+local audiolock = require("lib.audiolock")
 
 local args = { ... }
 local AUTOSTART = "/startup/void_radar.lua"
@@ -433,6 +434,13 @@ local function alarmLoop()
     if not mode and now() < alarmTestUntil then mode = "wail" end
     if mode and #devices.speakers > 0 then
       buffers[mode] = buffers[mode] or siren.build(mode)
+      -- the siren has priority over the music player (other tab): claim the
+      -- speakers first, then flush whatever music is still queued in them
+      local firstBeat = not playing
+      audiolock.claim()
+      if firstBeat then
+        for _, spk in ipairs(devices.speakers) do pcall(peripheral.call, spk, "stop") end
+      end
       for _, spk in ipairs(devices.speakers) do
         if devices.audio[spk] then
           pcall(peripheral.call, spk, "playAudio", buffers[mode], volume())
@@ -445,6 +453,7 @@ local function alarmLoop()
     else
       if playing then
         for _, spk in ipairs(devices.speakers) do pcall(peripheral.call, spk, "stop") end
+        audiolock.release()
         playing = false
       end
       if maxCycles and serviceDone then return end
@@ -535,6 +544,7 @@ else
 end
 saveLists(true)
 for _, spk in ipairs(devices.speakers) do pcall(peripheral.call, spk, "stop") end
+audiolock.release()
 if not headless then
   -- leave the visible messages in the queue for the record
   for _, m in ipairs(alerts.drain(queue)) do pcall(discord.send, m[1], m[2]) end
