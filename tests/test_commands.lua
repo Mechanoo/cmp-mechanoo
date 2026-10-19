@@ -111,6 +111,8 @@ t.contains(out, "UTC+2", "offset shown")
 t.contains(out, "16:02", "time shifted")
 out = run("timezone 99")
 t.contains(out, "usage", "bad offset")
+out, r = run("exit")
+t.truthy(r.exit, "exit flag")
 out = run("nonsense")
 t.contains(out, "unknown command", "unknown command")
 

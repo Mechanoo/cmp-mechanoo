@@ -14,7 +14,7 @@ peripheral = {
     if m == "getTracks" then return { { id = "abc12345", category = "SABLE", position = { x = 5, y = 70, z = 5 }, velocity = { x = 0, y = 0, z = 0 } } } end
   end,
 }
-local script = { "help", "hostile Steve", "visitor Ann 2h", "ship abc trust", "label abc Flagship", "targets", "zone" }
+local script = { "help", "hostile Steve", "visitor Ann 2h", "ship abc trust", "label abc Flagship", "targets", "zone", "exit" }
 local i = 0
 read = function()
   sleep(0.1) -- let the service run a cycle between commands
@@ -26,7 +26,7 @@ end
 local fn = assert(loadfile("/work/apps/radar/main.lua", "t", _ENV))
 local ok, err = pcall(fn)
 term.redirect(term.native())
-t.eq(err, "end of script", "ran until the script ended: " .. tostring(err))
+t.truthy(ok, "exit stops the radar cleanly: " .. tostring(err))
 local h = fs.open("/void-data/lists.json", "r")
 local saved = textutils.unserialiseJSON(h.readAll())
 h.close()

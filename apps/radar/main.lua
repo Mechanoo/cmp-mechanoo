@@ -2,8 +2,9 @@
 -- friend/foe lists, runs the no-go zone countdown and reports to Discord.
 -- Cannons are NOT controlled yet: "engage" is only reported.
 --
---   void radar                 start (type "help" at the prompt)
---   void radar autostart on    start automatically when the computer boots
+--   void radar                 start (type "help" at the prompt, "exit" to stop)
+--   void radar tab             start in its own tab (advanced computer), shell stays free
+--   void radar autostart on    start automatically when the computer boots (in a tab if possible)
 --   void radar autostart off
 package.path = "/void/?.lua;" .. package.path
 
@@ -24,12 +25,38 @@ local siren = require("lib.siren")
 local args = { ... }
 local AUTOSTART = "/startup/void_radar.lua"
 
+local AUTOSTART_CODE = [=[
+-- installed by void: starts the radar on boot
+-- On an advanced computer the radar gets its own tab and the shell stays free.
+if multishell and shell.openTab then
+  local id = shell.openTab("/void/bin/void.lua", "radar")
+  if id then multishell.setTitle(id, "radar") end
+else
+  shell.run("/void/bin/void.lua", "radar")
+end
+]=]
+
+if args[1] == "tab" then
+  if not (multishell and shell.openTab) then
+    printError("Tabs need an advanced computer. Use 'void radar' and type 'exit' to stop it.")
+    return
+  end
+  local id = shell.openTab("/void/bin/void.lua", "radar")
+  multishell.setTitle(id, "radar")
+  print("Radar runs in tab " .. id .. ". Click the tab bar at the top to switch.")
+  return
+end
+
 if args[1] == "autostart" then
   if args[2] == "on" then
     local h = fs.open(AUTOSTART, "w")
-    h.write('-- installed by void: starts the radar on boot\nshell.run("/void/bin/void.lua", "radar")\n')
+    h.write(AUTOSTART_CODE)
     h.close()
-    print("The radar now starts when this computer boots.")
+    if multishell then
+      print("The radar now starts in its own tab when this computer boots.")
+    else
+      print("The radar now starts when this computer boots ('exit' stops it).")
+    end
   elseif args[2] == "off" then
     fs.delete(AUTOSTART)
     print("Autostart removed.")
@@ -462,6 +489,7 @@ local function inputLoop()
     for _, ev in ipairs(r.events) do alerts.push(queue, ev, alertCtx()) end
     if r.configChanged then saveConfig() end
     saveLists()
+    if r.exit then return end
     drawStatus()
   end
 end
@@ -506,3 +534,14 @@ else
   parallel.waitForAny(serviceLoop, discordLoop, inputLoop, alarmLoop)
 end
 saveLists(true)
+for _, spk in ipairs(devices.speakers) do pcall(peripheral.call, spk, "stop") end
+if not headless then
+  -- leave the visible messages in the queue for the record
+  for _, m in ipairs(alerts.drain(queue)) do pcall(discord.send, m[1], m[2]) end
+  term.redirect(root)
+  term.setBackgroundColor(colors.black)
+  term.setTextColor(colors.white)
+  term.clear()
+  term.setCursorPos(1, 1)
+  print("Radar stopped. Start it again with: void radar")
+end

@@ -36,6 +36,7 @@ C.HELP = {
   "alarm              siren state",
   "alarm mute [time]  silence the siren (default 10m)",
   "alarm on | alarm test | alarm volume <0-3>",
+  "exit               stop the radar (back to the shell)",
 }
 
 local function words(line)
@@ -278,6 +279,10 @@ function C.run(ctx, line)
     say("times in " .. (off == 0 and "UTC" or ("UTC" .. (off > 0 and "+" or "") .. off)))
     local lines = w[2] and history.details(ctx.history, w[2], off) or history.summary(ctx.history, off, 30)
     for _, l in ipairs(lines) do say(l) end
+
+  elseif cmd == "exit" or cmd == "quit" then
+    out.exit = true
+    say("stopping the radar")
 
   elseif cmd == "alarm" then
     local sub = (w[2] or ""):lower()
