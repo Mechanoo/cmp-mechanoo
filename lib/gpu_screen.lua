@@ -62,7 +62,9 @@ local function attach(s)
     if type(d) ~= "number" then error("no monitor found next to the GPU block (autoDetect returned " .. tostring(d) .. ")", 0) end
     local info = gpu.getDisplayInfo(d)
     s.gpuName, s.display, s.info = name, d, info
-    s.view = view.new(gpu, d, info, { font = s.deps.font and s.deps.font() })
+    -- rounded boxes only if this DirectGPU version has drawRoundedRect
+    local rounded = pcall(gpu.drawRoundedRect, d, 0, 0, 4, 4, 2, 0, 0, 0, true)
+    s.view = view.new(gpu, d, info, { font = s.deps.font and s.deps.font(), rounded = rounded })
     s.sig = nil
     s.deps.log(("screen: display %d on %s, %sx%s px"):format(d, name,
       tostring(info and info.pixelWidth), tostring(info and info.pixelHeight)))
@@ -149,7 +151,8 @@ function S.status(s)
   end
   local v = s.view
   return {
-    ("screen: display %d on %s, %dx%d px, font %s"):format(s.display, s.gpuName, v.W, v.H, v.font),
+    ("screen: display %d on %s, %dx%d px, font %s, rounded boxes %s"):format(s.display, s.gpuName, v.W, v.H, v.font,
+      v.rounded and "yes" or "no"),
     ("last frame: %d GPU calls, %d ms, %d frame(s) drawn"):format(s.lastCalls, s.lastMs, s.frames),
   }
 end

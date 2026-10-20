@@ -9,8 +9,8 @@
 -- Escort rule: an unknown ship with a trusted or visitor player within
 -- escortDist is treated as friendly (a friend flying an unlisted ship).
 --
--- Confirmation: radars report ghost objects for a single sample while chunks
--- load (measured: six unknown ships at once, each seen once). An unknown target
+-- Confirmation: radars can report short-lived objects (ragdoll parts are filtered
+-- by the tracker; this catches anything else seen only once). An unknown target
 -- that the detector does not know by name must be seen in confirmSightings
 -- updates before it causes alerts, a countdown or a visit record ("pending").
 --

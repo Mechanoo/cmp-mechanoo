@@ -15,6 +15,7 @@ local V = require("lib.vec")
 local history = require("lib.history")
 local clock = require("lib.clock")
 local reference = require("lib.reference")
+local SCREEN_RANGES = require("lib.gpu_view").RANGES
 
 local C = {}
 
@@ -318,8 +319,19 @@ function C.run(ctx, line)
       out.configChanged = true
       out.screen = "reset"
       say("screen font is " .. name .. " now")
+    elseif sub == "range" then
+      local r = tonumber(w[3])
+      local ok = false
+      for _, x in ipairs(SCREEN_RANGES) do if x == r then ok = true end end
+      if not ok then
+        say("usage: screen range " .. table.concat(SCREEN_RANGES, "|") .. ", now " .. tostring(cfg.screenRange or 256))
+        return out
+      end
+      cfg.screenRange = r
+      out.configChanged = true
+      say("screen range is " .. r .. " blocks now")
     else
-      say("usage: screen | screen test | screen events | screen reset | screen font <name>")
+      say("usage: screen | screen test | screen events | screen reset | screen font <name> | screen range <blocks>")
     end
 
   elseif cmd == "exit" or cmd == "quit" then

@@ -7,6 +7,11 @@
 -- * A ship gets a new id when it is disassembled and assembled again. A new ship
 --   that appears close to where a listed ship vanished takes over its entry
 --   ("takeover"); if the old ship shows up again the takeover is undone.
+-- * Ragdolls (Sable Ragdolls mod): a player or mob knocked into a ragdoll becomes
+--   one Sable sub-level per body part, so the radars see a burst of brand-new
+--   SABLE tracks (six for a player) within a few blocks, for about 1.5 s. A
+--   cluster of at least ragdollParts new, unlisted ships within ragdollDist of
+--   each other is marked kind "ragdoll": no alerts, no visits, not in T.all.
 local V = require("lib.vec")
 local lists = require("lib.lists")
 
@@ -16,6 +21,9 @@ T.DEFAULTS = {
   holdMs = 10000,
   takeoverWindowMs = 60000,
   takeoverDist = 16,
+  ragdollParts = 3,      -- new ships in one cluster that make it a ragdoll
+  ragdollDist = 3,       -- blocks between neighbouring parts of one cluster
+  ragdollWindowMs = 3000, -- a ship counts as new for this long after its first sighting
 }
 
 function T.new(cfg)
@@ -82,6 +90,53 @@ local function takeover(tr, ls, now, newShips, seen, events)
   end
 end
 
+-- Marks ragdoll clusters among the ships seen in this update. Candidates are young
+-- unlisted ships and parts already known as ragdoll (a part a radar missed in the
+-- first sample joins its cluster later). Returns the ids of the newly marked parts.
+local function findRagdolls(tr, ls, now, seenIds, events)
+  local cfg = tr.cfg
+  local cand = {}
+  for _, id in ipairs(seenIds) do
+    local t = tr.targets[id]
+    if t.kind == "ragdoll" or (t.kind == "ship" and not ls.ships[id] and now - t.firstSeen <= cfg.ragdollWindowMs) then
+      cand[#cand + 1] = t
+    end
+  end
+  local done, marked = {}, {}
+  for i = 1, #cand do
+    if not done[i] then
+      local cluster, queue = {}, { i }
+      done[i] = true
+      while #queue > 0 do
+        local j = table.remove(queue)
+        cluster[#cluster + 1] = cand[j]
+        for k = 1, #cand do
+          if not done[k] and V.dist3d(cand[j].pos, cand[k].pos) <= cfg.ragdollDist then
+            done[k] = true
+            queue[#queue + 1] = k
+          end
+        end
+      end
+      local known = false
+      for _, t in ipairs(cluster) do if t.kind == "ragdoll" then known = true end end
+      if known or #cluster >= cfg.ragdollParts then
+        local fresh = {}
+        for _, t in ipairs(cluster) do
+          if t.kind ~= "ragdoll" then
+            t.kind = "ragdoll"
+            fresh[#fresh + 1] = t.id
+            marked[t.id] = true
+          end
+        end
+        if #fresh > 0 and not known then
+          events[#events + 1] = { type = "ragdoll", ids = fresh, parts = #cluster, pos = V.copy(cluster[1].pos) }
+        end
+      end
+    end
+  end
+  return marked
+end
+
 local function settleTakeovers(tr, ls, now, seen, events)
   for id, e in pairs(ls.ships) do
     if e.replacedBy then
@@ -113,6 +168,7 @@ function T.update(tr, now, tracks, players, ls)
       local kind = T.kindOf(tk.category)
       local isNew = tr.targets[id] == nil
       local t = touch(tr, id, now, events, kind)
+      if t.kind == "ragdoll" then kind = "ragdoll" end -- stays a ragdoll part until it is gone
       t.kind, t.category, t.entityType = kind, tk.category, tk.entityType
       t.pos = V.copy(tk.position)
       t.vel = V.copy(tk.velocity) or { x = 0, y = 0, z = 0 }
@@ -151,6 +207,16 @@ function T.update(tr, now, tracks, players, ls)
     t.sightings = (t.sightings or 0) + 1 -- updates in which the target was really seen
   end
 
+  local seenIds = {}
+  for id in pairs(seen) do seenIds[#seenIds + 1] = id end
+  table.sort(seenIds) -- stable cluster order
+  local ragdolls = findRagdolls(tr, ls, now, seenIds, events)
+  if next(ragdolls) then
+    local keep = {}
+    for _, n in ipairs(newShips) do if not ragdolls[n.id] then keep[#keep + 1] = n end end
+    newShips = keep
+  end
+
   for id in pairs(seen) do
     local e = ls.ships[id]
     local t = tr.targets[id]
@@ -183,10 +249,12 @@ function T.classify(t, ls)
   return "other"
 end
 
--- All targets as an array, sorted by id (stable output).
+-- All targets as an array, sorted by id (stable output). Ragdoll parts are left out.
 function T.all(tr)
   local out = {}
-  for _, t in pairs(tr.targets) do out[#out + 1] = t end
+  for _, t in pairs(tr.targets) do
+    if t.kind ~= "ragdoll" then out[#out + 1] = t end
+  end
   table.sort(out, function(a, b) return a.id < b.id end)
   return out
 end

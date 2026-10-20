@@ -46,9 +46,9 @@ local function tracks()
   elseif s >= 7 then
     list[#list + 1] = { id = "s-new", category = "SABLE", entityType = "Sable:ship", position = { x = 12, y = 70, z = 10 }, velocity = { x = 0, y = 0, z = 0 } }
   end
-  if s >= 1 and s < 2 then -- ghost objects for one sample, like after a chunk load
+  if s >= 1 and s < 3 then -- a ragdoll: six body parts as new SABLE tracks for two samples
     for g = 1, 6 do
-      list[#list + 1] = { id = "ghost-" .. g, category = "SABLE", entityType = "Sable:ship", position = { x = 30 + g, y = 70, z = -30 }, velocity = { x = 0, y = 0, z = 0 } }
+      list[#list + 1] = { id = "ghost-" .. g, category = "SABLE", entityType = "Sable:ship", position = { x = 30 + g * 0.4, y = 70, z = -30 }, velocity = { x = 0, y = 0, z = 0 } }
     end
   end
   list[#list + 1] = { id = "u-ghost", category = "PLAYER", entityType = "entity.minecraft.player", position = { x = 150, y = 64, z = 150 }, velocity = { x = 0, y = 0, z = 0 } }
@@ -131,7 +131,7 @@ t.eq(A:find("Mechanoo", 1, true), nil, "trusted owner never reported")
 t.contains(L, "SHIP REASSEMBLED", "ship takeover logged")
 t.contains(L, "took over the list **trusted**", "takeover text")
 t.eq(A:find("s-new", 1, true), nil, "reassembled ship is not an alert")
-t.eq(A:find("ghost-", 1, true), nil, "one-sample ghost ships cause no alert")
+t.eq(A:find("ghost-", 1, true), nil, "ragdoll parts seen twice cause no alert")
 t.eq(L:find("ghost-", 1, true), nil, "and no visit record")
 
 t.eq(#chatCalls, 0, "no chat messages to players")
@@ -161,6 +161,7 @@ local hist = textutils.unserialiseJSON(readAll("/void-data/history.json"))
 t.eq(hist.players.passerby and hist.players.passerby.visits, 1, "history saved")
 local logText = readAll("/void-data/radar.log")
 t.contains(logText, "CONTACT Stranger (unknown player)", "events written to radar.log")
+t.contains(logText, "RAGDOLL ignored: 6 new parts at x 30 y 70 z -30", "ragdoll noted in radar.log")
 t.contains(logText, "1970-01-01 00:16:40 ", "UTC timestamp in radar.log")
 local rcfg = textutils.unserialiseJSON(readAll("/void-data/radar.json"))
 t.eq(rcfg.zone and rcfg.zone.x1, -80, "zone created around the radars")

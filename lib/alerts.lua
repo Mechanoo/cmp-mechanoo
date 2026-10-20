@@ -72,6 +72,12 @@ function A.format(ev, ctx)
   local ty = ev.type
   local ch, color, title, lines, game
 
+  if ty == "ragdoll" then -- a knocked-down player or mob: game log only, never Discord
+    local p = ev.pos or {}
+    return nil, nil, ("RAGDOLL ignored: %d new parts at x %d y %d z %d"):format(ev.parts or 0,
+      math.floor(p.x or 0), math.floor(p.y or 0), math.floor(p.z or 0))
+  end
+
   if ty == "detected" then
     ch, color, title = "alerts", A.COLOR.yellow, "CONTACT: " .. name(t)
     lines = { "Unknown " .. kindWord(t) .. " near **" .. base .. "** at " .. at(now, ctx), position(t),

@@ -91,7 +91,7 @@ t.contains(joined, "LEVEL", "status bar shows the level")
 t.contains(joined, "Void test", "status bar shows the base name")
 t.contains(joined, "RADAR", "tab bar")
 t.contains(joined, "TARGETS", "tab bar: targets")
-t.contains(joined, "NEAREST", "radar page: nearest list")
+t.contains(joined, "CONTACTS", "radar page: contact list")
 t.contains(joined, "Steve", "radar page: player")
 t.contains(joined, "N", "compass")
 local inside = true
@@ -102,6 +102,54 @@ t.truthy(inside, "all text starts inside the display")
 t.truthy(#view.hits >= 9, "tabs and targets are touchable")
 -- the level 4+ jump is not triggered by a calm radar
 t.eq(view.lastLevel, level and level.n or 0, "level remembered")
+
+-- the scope has a fixed range: a far target does not change its scale
+local function scopeCalls(mm)
+  g.calls = {}
+  frame(mm)
+  local out = {}
+  for _, c in ipairs(g.calls) do
+    if c[1] == "drawCircle" and c[9] == false then out[#out + 1] = table.concat({ c[3], c[4], c[5] }, ",") end
+  end
+  return table.concat(out, ";")
+end
+local near = V.model(args)
+local onlyNear = {}
+for _, x in ipairs(near.targets) do if x.dist < 200 then onlyNear[#onlyNear + 1] = x end end
+local farModel = V.model(args)
+local nearModel = V.model(args)
+nearModel.targets = onlyNear
+t.eq(scopeCalls(farModel):match("^[^;]+;[^;]+;[^;]+;[^;]+"), scopeCalls(nearModel):match("^[^;]+;[^;]+;[^;]+;[^;]+"),
+  "rings and rim stay the same with and without a far target")
+t.eq(m.range, 256, "default scope range")
+local zoomOut = findHit(function(h) return h.kind == "cmd" and h.cmd == "screen range 512" end)
+local zoomIn = findHit(function(h) return h.kind == "cmd" and h.cmd == "screen range 128" end)
+t.truthy(zoomOut and zoomIn, "zoom buttons ask for the next range steps")
+local zr = tap(zoomOut)
+t.eq(zr and zr.cmd, "screen range 512", "zoom button returns its command")
+local cfgZ = { zone = cfg.zone }
+local rz = commands.run({ lists = ls, tracker = tr, config = cfgZ, now = NOW }, "screen range 512")
+t.eq(cfgZ.screenRange, 512, "screen range stored")
+t.truthy(rz.configChanged, "screen range saves the config")
+commands.run({ lists = ls, tracker = tr, config = cfgZ, now = NOW }, "screen range 300")
+t.eq(cfgZ.screenRange, 512, "only the listed steps are accepted")
+local m512 = V.model({ now = NOW, cfg = { zone = cfg.zone, screenRange = 512 }, tracker = tr, decisions = decisions, lists = ls,
+  history = hist, level = level, log = {} })
+t.eq(m512.range, 512, "model uses the stored range")
+frame(m512)
+t.eq(findHit(function(h) return h.kind == "cmd" and h.cmd == "screen range 1024" end) ~= nil, true, "at 512 '-' goes to 1024")
+local m1024 = V.model({ now = NOW, cfg = { zone = cfg.zone, screenRange = 1024 }, tracker = tr, decisions = decisions, lists = ls,
+  history = hist, level = level, log = {} })
+frame(m1024)
+t.eq(findHit(function(h) return h.kind == "cmd" and h.cmd:find("^screen range 2") end), nil, "no step beyond 1024")
+-- rounded boxes only when asked for
+local gr = mockGpu()
+local rr = 0
+gr.drawRoundedRect = function() rr = rr + 1 end
+local vr = V.new(gr, 7, { pixelWidth = 640, pixelHeight = 384 }, { rounded = true })
+V.draw(vr, V.model(args))
+t.truthy(rr > 0, "rounded boxes drawn with drawRoundedRect")
+frame()
 
 -- tabs
 local function gotoTab(id)

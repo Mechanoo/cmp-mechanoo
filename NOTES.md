@@ -38,6 +38,8 @@ Peripheral names and quirks found in the world. Add output of `peripherals` here
 - The player name comes from the list of `getPlayersInRange` (strings) or from `displayName` (from the AP LuaConverter).
 - `getPlayer` also accepts a UUID, so a radar-only PLAYER track can be resolved to a name.
 
-## Ghost tracks after a chunk load (radar app, singleplayer)
-- About 13 s after the base chunks loaded again, the plane radars reported six SABLE tracks at once inside the zone; each was seen in exactly one sample and never again. The real ship nearby kept its id.
-- The radar app now needs two sightings of an unknown radar-only target before it alerts or counts down.
+## Ghost ships = ragdolls (radar app)
+- First seen as "ghost tracks after a chunk load": six SABLE tracks at once inside the zone, each seen for one sample.
+- Real cause (found by the user in game): a player switching to a ragdoll (Sable Ragdolls mod). The mod builds one Sable sub-level per body part (jar log text: "spawned {} Sable sublevels and {} joints"), so the plane radars see six brand-new SABLE ids within about 2 blocks. Each ragdoll gets new ids.
+- Pack config `sable_player_ragdoll-server.toml`: `ragdollDurationTicks = 30` (1.5 s), so a ragdoll is seen in one or two 1 s samples. Triggers (Ragdoll Reactions): falls, explosions incl. CBC shells, elytra wall hits, lightning, sharp velocity changes; not plain hits.
+- The radar app marks a cluster of at least 3 new unlisted SABLE tracks within 3 blocks of each other as a ragdoll: no alert, no visit, not shown, one log line `RAGDOLL ignored: N new parts at x y z`. The two-sightings rule for unknown radar-only targets stays.

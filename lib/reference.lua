@@ -44,6 +44,7 @@ R.GROUPS = {
     { "screen events", "Log every touch event for 15 s, to see what the display sends." },
     { "screen reset", "Drop the display and create it again (after moving the monitor or the GPU block)." },
     { "screen font <name>", "Font for the screen (default SansSerif). Java names like SansSerif, Monospaced or Dialog always exist." },
+    { "screen range <blocks>", "Fixed range of the radar scope: 64, 128, 256 (default), 512 or 1024 blocks. Same as the - and + buttons on the screen." },
   } },
   { title = "SHELL: void (outside the radar)", items = {
     { "void list", "Installed apps." },

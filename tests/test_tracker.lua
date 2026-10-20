@@ -138,4 +138,60 @@ ev = tracker.update(tr7, now + 1000, { trk("home", "SABLE", 0, 70, 0), trk("intr
 t.eq(find(ev, "takeover"), nil, "new ship next to a visible trusted ship takes nothing")
 t.eq(lists.ship(ls7, "intruder"), nil, "intruder unknown")
 
+-- ragdoll: six body parts appear as new SABLE tracks within a few blocks
+local function ragdollTracks(x, n, missing)
+  local out = {}
+  local off = { { 0, 1.5, 0 }, { 0, 0.8, 0 }, { 0.4, 0.8, 0 }, { -0.4, 0.8, 0 }, { 0.2, 0, 0 }, { -0.2, 0, 0 } }
+  for i = 1, n do
+    if i ~= missing then
+      out[#out + 1] = trk("rd" .. x .. "-" .. i, "SABLE", x + off[i][1], 70 + off[i][2], off[i][3])
+    end
+  end
+  return out
+end
+local ls8 = lists.new()
+local tr8 = tracker.new()
+now = 17000000
+local tracks8 = ragdollTracks(100, 6, 3) -- one part missed by the radars in the first sample
+tracks8[#tracks8 + 1] = trk("realship", "SABLE", 140, 70, 0)
+ev = tracker.update(tr8, now, tracks8, {}, ls8)
+local rd = find(ev, "ragdoll")
+t.truthy(rd, "ragdoll event")
+t.eq(rd and rd.parts, 5, "five parts seen in the first sample")
+t.eq(tr8.targets["rd100-1"].kind, "ragdoll", "part marked ragdoll")
+t.eq(tr8.targets["realship"].kind, "ship", "a ship 40 blocks away is no part of it")
+local all8 = tracker.all(tr8)
+t.eq(#all8, 1, "ragdoll parts are left out of tracker.all")
+t.eq(all8[1] and all8[1].id, "realship", "only the real ship is listed")
+now = now + 500
+ev = tracker.update(tr8, now, { trk("rd100-3", "SABLE", 100.4, 70.8, 0), trk("rd100-1", "SABLE", 100, 71.5, 0) }, {}, ls8)
+t.eq(tr8.targets["rd100-3"].kind, "ragdoll", "a late part seen next to one known part joins the ragdoll")
+now = now + 500
+ev = tracker.update(tr8, now, ragdollTracks(100, 6), {}, ls8)
+t.eq(tr8.targets["rd100-3"].kind, "ragdoll", "the late part joins the known ragdoll")
+t.eq(find(ev, "ragdoll"), nil, "no second ragdoll event for the same ragdoll")
+t.eq(#tracker.all(tr8), 1, "only the (held) real ship is listed")
+
+-- two ships close together are no ragdoll (fewer than ragdollParts)
+local ls9 = lists.new()
+local tr9 = tracker.new()
+now = 19000000
+ev = tracker.update(tr9, now, { trk("a", "SABLE", 0, 70, 0), trk("b", "SABLE", 2, 70, 0) }, {}, ls9)
+t.eq(find(ev, "ragdoll"), nil, "two new ships are no ragdoll")
+t.eq(tr9.targets["a"].kind, "ship", "they stay ships")
+-- an old ship next to a burst of new parts stays a ship
+now = now + 10000 - 1
+ev = tracker.update(tr9, now, { trk("a", "SABLE", 0, 70, 0), trk("p1", "SABLE", 1, 70, 0), trk("p2", "SABLE", 1.5, 70, 0),
+  trk("p3", "SABLE", 1, 71, 0) }, {}, ls9)
+t.truthy(find(ev, "ragdoll"), "three new parts are a ragdoll")
+t.eq(tr9.targets["a"].kind, "ship", "the old ship next to it stays a ship")
+-- a listed ship is never taken as a part
+local ls10 = lists.new()
+local tr10 = tracker.new()
+now = 21000000
+lists.setShip(ls10, "l1", "trusted", now)
+ev = tracker.update(tr10, now, { trk("l1", "SABLE", 0, 70, 0), trk("n1", "SABLE", 1, 70, 0), trk("n2", "SABLE", 2, 70, 0) }, {}, ls10)
+t.eq(find(ev, "ragdoll"), nil, "a listed ship does not count as a part")
+t.eq(tr10.targets["l1"].kind, "ship", "listed ship stays a ship")
+
 t.finish("tracker")
