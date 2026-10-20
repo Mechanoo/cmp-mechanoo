@@ -312,6 +312,22 @@ local function handle(ev)
   if ev.type == "detected" or ev.type == "hostile" then chime() end
 end
 
+-- After computer and radars were moved, the radars stand outside the old zone.
+-- The zone is NOT moved automatically (one moved or broken radar would shift it);
+-- this warns once per new radar position, in game and in the Discord log.
+local movedWarnedAt
+local function checkMoved()
+  if not (cfg.zone and radarCenter) or Z.contains(cfg.zone, radarCenter) then
+    movedWarnedAt = nil
+    return
+  end
+  local key = math.floor(radarCenter.x / 16) .. ":" .. math.floor(radarCenter.z / 16)
+  if movedWarnedAt == key then return end
+  movedWarnedAt = key
+  local ch, game = alerts.push(queue, { type = "radars_moved", pos = radarCenter, zone = cfg.zone }, alertCtx())
+  if game then log("! " .. game) end
+end
+
 local function applyAlarm()
   if not cfg.alarmSide then return end
   local on = false
@@ -413,6 +429,7 @@ local function serviceLoop()
     local started = now()
     if started - lastScan > 30000 then
       scan()
+      checkMoved()
       lastScan = started
     end
     cycle()
@@ -615,6 +632,7 @@ if not headless and cfg.referenceHash ~= reference.hash() then
   saveConfig()
 end
 if not cfg.zone then log("No zone yet: type 'zone center <x> <z>'") end
+checkMoved()
 if #devices.radars == 0 and #devices.detectors == 0 then log("No radar or detector found. Check the wired modems (red).") end
 log("Type 'help' for commands.")
 
@@ -625,7 +643,7 @@ else
   scr = gpuScreen.new({
     args = function()
       return { now = now(), cfg = cfg, tracker = tr, decisions = decisions, lists = ls, history = hist,
-        level = level, log = logLines }
+        level = level, log = logLines, radarCenter = radarCenter }
     end,
     run = function(cmd) execLine(cmd) end,
     log = function(text) log(text) end,

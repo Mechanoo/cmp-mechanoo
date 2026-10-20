@@ -186,6 +186,8 @@ function V.model(a)
   local muted = cfg.alarmMuteUntil ~= nil and a.now < cfg.alarmMuteUntil
   return {
     now = a.now, baseName = cfg.baseName or "Void base", zone = cfg.zone, level = a.level,
+    radarCenter = a.radarCenter,
+    radarsOutside = (cfg.zone and a.radarCenter and not Z.contains(cfg.zone, a.radarCenter)) or false,
     targets = targets, log = a.log or {}, visitors = visitors,
     visitorCount = hist and (function() local n = 0 for _ in pairs(hist.players) do n = n + 1 end return n end)() or 0,
     last24h = hist and history.recentCount(hist, a.now, 24 * 3600000) or 0,
@@ -204,7 +206,9 @@ function V.signature(model, view)
   local parts = { model.level and model.level.n or 0, #model.log, model.log[#model.log] or "", model.last24h,
     model.visitorCount, view and view.selected or "-", view and view.selectedPlayer or "-", view and view.page or "",
     view and view.logScroll or 0, model.alarm.muted and 1 or 0, model.alarm.volume, model.range, model.clock,
-    model.hidden, model.stats and model.stats.visits or 0 }
+    model.hidden, model.stats and model.stats.visits or 0,
+    model.zone and (model.zone.x1 .. "," .. model.zone.z1 .. "," .. (model.zone.chunks or 0)) or "-",
+    model.radarCenter and (math.floor(model.radarCenter.x) .. "," .. math.floor(model.radarCenter.z)) or "-" }
   for _, cc in ipairs(model.cats) do parts[#parts + 1] = cc.id .. cc.count .. (cc.on and "+" or "-") end
   local cell = math.max(2, model.range / 48) -- about one blip size on the scope
   for _, t in ipairs(model.targets) do
@@ -1040,9 +1044,20 @@ local function drawControlPage(view, m, r)
     yy = yy + u * 1.5
   end
   info("zone", Z.describe(m.zone))
+  local rc = m.radarCenter
+  info("radars", rc and ("x %d z %d"):format(math.floor(rc.x + 0.5), math.floor(rc.z + 0.5)) or "position unknown")
+  if m.radarsOutside then
+    text(view, fit("OUTSIDE ZONE - moved?", colW - 2 * u, u), px, yy, V.COLOR.warn, u, "bold")
+    yy = yy + u * 1.5
+  end
   info("detector", m.detectRange .. " blocks")
   info("scope", m.range .. " m")
   yy = yy + gap
+  if rc then
+    button(view, "ZONE TO RADARS", px, yy, colW - 2 * u, bh, m.radarsOutside and BTN.warn or BTN.neutral,
+      { kind = "cmd", cmd = "zone radars", stay = true })
+    yy = yy + bh + gap
+  end
   button(view, "COMMANDS TO DISCORD", px, yy, colW - 2 * u, bh, BTN.neutral, { kind = "cmd", cmd = "commands discord", stay = true })
 end
 

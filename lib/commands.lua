@@ -32,6 +32,7 @@ C.HELP = {
   "zone               show the no-go zone",
   "zone center <x> <z> [chunks]",
   "zone radars [chunks]   centre on the radars",
+  "zone size <chunks> same centre, new size",
   "history [name]     how often and when players were here",
   "timezone <hours>   e.g. timezone 2 for UTC+2",
   "basename <text>    name of the base in Discord",
@@ -268,11 +269,19 @@ function C.run(ctx, line)
 
   elseif cmd == "zone" then
     local sub = (w[2] or ""):lower()
+    -- a new centre keeps the current size unless a size is given
+    local keep = tostring(cfg.zone and cfg.zone.chunks or 10)
+    local function validSize(n) return n and n >= 1 and n <= 64 and n % 1 == 0 end
     if sub == "" then
       say("zone: " .. Z.describe(cfg.zone))
+      local rc = ctx.radarCenter
+      if rc then
+        say(("radars at x %d z %d%s"):format(math.floor(rc.x + 0.5), math.floor(rc.z + 0.5),
+          (cfg.zone and not Z.contains(cfg.zone, rc)) and " - OUTSIDE the zone, type 'zone radars' to move it" or ""))
+      end
     elseif sub == "center" or sub == "centre" then
-      local x, z, n = tonumber(w[3]), tonumber(w[4]), tonumber(w[5] or "10")
-      if not (x and z and n) or n < 1 or n > 64 or n % 1 ~= 0 then
+      local x, z, n = tonumber(w[3]), tonumber(w[4]), tonumber(w[5] or keep)
+      if not (x and z) or not validSize(n) then
         say("usage: zone center <x> <z> [chunks 1-64]")
         return out
       end
@@ -280,20 +289,30 @@ function C.run(ctx, line)
       out.configChanged = true
       say("zone: " .. Z.describe(cfg.zone))
     elseif sub == "radars" then
-      local n = tonumber(w[3] or "10")
+      local n = tonumber(w[3] or keep)
       if not ctx.radarCenter then
         say("no radar position known")
         return out
       end
-      if not n or n < 1 or n > 64 or n % 1 ~= 0 then
+      if not validSize(n) then
         say("usage: zone radars [chunks 1-64]")
         return out
       end
       cfg.zone = Z.fromCenter(ctx.radarCenter.x, ctx.radarCenter.z, n)
       out.configChanged = true
       say("zone: " .. Z.describe(cfg.zone))
+    elseif sub == "size" then
+      local n = tonumber(w[3])
+      if not cfg.zone or not validSize(n) then
+        say(cfg.zone and "usage: zone size <chunks 1-64>" or "set a centre first: zone center <x> <z>")
+        return out
+      end
+      local c = Z.center(cfg.zone)
+      cfg.zone = Z.fromCenter(c.x, c.z, n)
+      out.configChanged = true
+      say("zone: " .. Z.describe(cfg.zone))
     else
-      say("usage: zone | zone center <x> <z> [chunks] | zone radars [chunks]")
+      say("usage: zone | zone center <x> <z> [chunks] | zone radars [chunks] | zone size <chunks>")
     end
 
   elseif cmd == "history" then

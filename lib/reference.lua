@@ -22,9 +22,10 @@ R.GROUPS = {
     { "label <id> <text>", "Give a listed ship a name (up to 24 characters), shown in lists and Discord." },
   } },
   { title = "NO-GO ZONE", items = {
-    { "zone", "Show the zone: centre and size in chunks." },
-    { "zone center <x> <z> [chunks]", "Set the zone centre and size (1-64 chunks, default 10)." },
-    { "zone radars [chunks]", "Centre the zone on the average position of the plane radars." },
+    { "zone", "Show the zone (centre, size in chunks) and where the radars are." },
+    { "zone center <x> <z> [chunks]", "Set a new zone centre, e.g. after moving the base. Keeps the current size unless chunks (1-64) is given." },
+    { "zone radars [chunks]", "Centre the zone on the average position of the plane radars (after moving computer and radars). Also a button on the screen's CONTROL tab." },
+    { "zone size <chunks>", "Same centre, new size (1-64 chunks)." },
   } },
   { title = "ALARM", items = {
     { "alarm", "Show siren state: on or muted, volume, number of speakers." },

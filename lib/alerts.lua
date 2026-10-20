@@ -8,6 +8,7 @@ local V = require("lib.vec")
 local D = require("lib.duration")
 local C = require("lib.clock")
 local tracker = require("lib.tracker")
+local Z = require("lib.zone")
 
 local A = {}
 
@@ -152,6 +153,14 @@ function A.format(ev, ctx)
     ch, color, title = "log", A.COLOR.blue, ev.title
     lines = { ev.text }
     game = nil
+  elseif ty == "radars_moved" then
+    local p, c = ev.pos or {}, ev.zone and Z.center(ev.zone) or { x = 0, z = 0 }
+    local px, pz = math.floor((p.x or 0) + 0.5), math.floor((p.z or 0) + 0.5)
+    ch, color, title = "log", A.COLOR.orange, "RADARS MOVED"
+    lines = { ("The radars are at x %d z %d, outside the no-go zone (centre x %d z %d)."):format(px, pz,
+      math.floor(c.x), math.floor(c.z)),
+      "Type `zone radars` or tap ZONE TO RADARS on the CONTROL tab to move the zone." }
+    game = ("RADARS MOVED: at x %d z %d, outside the zone. Type 'zone radars' to move it."):format(px, pz)
   elseif ty == "online" then
     ch, color, title = "log", A.COLOR.green, "RADAR ONLINE"
     lines = { ev.text }

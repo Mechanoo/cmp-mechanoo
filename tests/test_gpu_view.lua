@@ -190,6 +190,22 @@ t.eq(action and action.cmd, "alarm mute 10m", "mute button returns its command")
 t.eq(view.page, "control", "stays on the control page")
 local volDown = findHit(function(h) return h.kind == "cmd" and h.cmd == "alarm volume 2" end)
 t.truthy(volDown, "volume - from 3 asks for 2")
+t.eq(findHit(function(h) return h.cmd == "zone radars" end), nil, "no zone button without a radar position")
+t.contains(joined, "position unknown", "control: radar position unknown")
+-- moved radars: position, warning and the ZONE TO RADARS button
+args.radarCenter = { x = 2000, y = 0, z = 2000 }
+local mm = V.model(args)
+t.truthy(mm.radarsOutside, "radars outside the zone are flagged")
+t.truthy(V.signature(mm) ~= V.signature(V.model((function() local a = {} for k, v in pairs(args) do a[k] = v end a.radarCenter = nil return a end)())),
+  "signature changes with the radar position")
+joined = frame(mm)
+t.contains(joined, "x 2000 z 2000", "control: radar position")
+t.contains(joined, "OUTSIDE ZONE", "control: outside warning")
+local zb = findHit(function(h) return h.kind == "cmd" and h.cmd == "zone radars" end)
+t.truthy(zb, "ZONE TO RADARS button")
+t.eq(tap(zb).cmd, "zone radars", "button runs zone radars")
+t.eq(view.page, "control", "stays on the control page after moving the zone")
+args.radarCenter = nil
 
 -- events scrolling
 for i = 1, 40 do args.log[#args.log + 1] = "[12:" .. i .. "]   filler " .. i end
