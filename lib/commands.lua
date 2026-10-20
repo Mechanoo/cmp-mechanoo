@@ -15,7 +15,8 @@ local V = require("lib.vec")
 local history = require("lib.history")
 local clock = require("lib.clock")
 local reference = require("lib.reference")
-local SCREEN_RANGES = require("lib.gpu_view").RANGES
+local gpuView = require("lib.gpu_view")
+local SCREEN_RANGES = gpuView.RANGES
 
 local C = {}
 
@@ -330,8 +331,32 @@ function C.run(ctx, line)
       cfg.screenRange = r
       out.configChanged = true
       say("screen range is " .. r .. " blocks now")
+    elseif sub == "show" or sub == "filter" then
+      local what, state = w[3], (w[4] or ""):lower()
+      if sub == "show" and what and (state == "on" or state == "off") then
+        local ids = {}
+        if what:lower() == "all" then
+          for _, c in ipairs(gpuView.CATS) do ids[#ids + 1] = c.id end
+        else
+          ids[1] = gpuView.catId(what)
+        end
+        if ids[1] then
+          cfg.screenShow = cfg.screenShow or {}
+          for _, id in ipairs(ids) do cfg.screenShow[id] = state == "on" end
+          out.configChanged = true
+        else
+          say("unknown category '" .. what .. "'")
+        end
+      elseif sub == "show" then
+        say("usage: screen show <category|all> on|off")
+      end
+      local parts = {}
+      for _, c in ipairs(gpuView.CATS) do
+        parts[#parts + 1] = c.label:lower() .. (gpuView.shown(cfg, c.id) and " on" or " off")
+      end
+      say("screen shows: " .. table.concat(parts, ", "))
     else
-      say("usage: screen | screen test | screen events | screen reset | screen font <name> | screen range <blocks>")
+      say("usage: screen | screen test | screen events | screen reset | screen font <name> | screen range <blocks> | screen show <category> on|off")
     end
 
   elseif cmd == "exit" or cmd == "quit" then

@@ -6,17 +6,70 @@ local H = {}
 
 H.KEEP = 20 -- visits kept per player (the count keeps going)
 
-function H.new(data)
+H.KEEP_DAYS = 60 -- days kept in the daily statistics
+
+-- (times before 1970 only happen in tests; they count as 1970-01-01)
+local function local_s(ms, offsetHours) return math.max(0, math.floor(ms / 1000 + (offsetHours or 0) * 3600)) end
+
+local function dayKey(ms, offsetHours) return os.date("!%Y-%m-%d", local_s(ms, offsetHours)) end
+
+-- hours are stored in the time zone that was set when the visit was recorded
+local function hourOf(ms, offsetHours) return tonumber(os.date("!%H", local_s(ms, offsetHours))) end
+
+-- Adds one visit to the per-player and daily statistics.
+local function addStats(h, p, v, offsetHours)
+  local ms = v.stop - v.start
+  if not p.longestMs or ms > p.longestMs then p.longestMs = ms end
+  if v.closest and (not p.closestEver or v.closest < p.closestEver) then p.closestEver = v.closest end
+  if v.zone then p.zoneVisits = (p.zoneVisits or 0) + 1 end
+  p.hours = p.hours or {}
+  for i = 1, 24 do p.hours[i] = p.hours[i] or 0 end
+  local hr = hourOf(v.start, offsetHours) + 1
+  p.hours[hr] = p.hours[hr] + 1
+  local k = dayKey(v.start, offsetHours)
+  local d = h.days[k]
+  if not d then
+    d = { visits = 0, ms = 0, zone = 0, names = {} }
+    h.days[k] = d
+  end
+  d.visits = d.visits + 1
+  d.ms = d.ms + ms
+  if v.zone then d.zone = d.zone + 1 end
+  local seen = false
+  for _, n in ipairs(d.names) do if n == p.name then seen = true end end
+  if not seen then d.names[#d.names + 1] = p.name end
+end
+
+local function trimDays(h)
+  local keys = {}
+  for k in pairs(h.days) do keys[#keys + 1] = k end
+  table.sort(keys)
+  for i = 1, #keys - H.KEEP_DAYS do h.days[keys[i]] = nil end
+end
+
+function H.new(data, offsetHours)
   data = data or {}
-  return { players = data.players or {}, dirty = false }
+  local h = { players = data.players or {}, days = data.days, dirty = false }
+  -- histories from before the statistics: build them from the stored recent visits
+  if not h.days then
+    h.days = {}
+    for _, p in pairs(h.players) do
+      if not p.hours then
+        for _, v in ipairs(p.recent or {}) do addStats(h, p, v, offsetHours) end
+      end
+    end
+    trimDays(h)
+  end
+  return h
 end
 
 function H.data(h)
-  return { players = h.players }
+  return { players = h.players, days = h.days }
 end
 
 -- Records a finished visit. Only players with a name are recorded.
-function H.record(h, ev)
+-- offsetHours: time zone for the daily and hourly statistics.
+function H.record(h, ev, offsetHours)
   local t = ev.target
   if not t or t.kind ~= "player" or not t.name or not ev.start or not ev.stop then return false end
   local k = string.lower(t.name)
@@ -34,11 +87,14 @@ function H.record(h, ev)
   p.visits = p.visits + 1
   p.last = ev.stop
   p.lastList = t.cls
-  table.insert(p.recent, 1, {
+  local v = {
     start = ev.start, stop = ev.stop, list = t.cls,
     closest = ev.closest and math.floor(ev.closest + 0.5) or nil, zone = ev.enteredZone or nil,
-  })
+  }
+  table.insert(p.recent, 1, v)
   while #p.recent > H.KEEP do table.remove(p.recent) end
+  addStats(h, p, v, offsetHours)
+  trimDays(h)
   h.dirty = true
   return true
 end
@@ -78,6 +134,40 @@ function H.recentCount(h, now, windowMs)
     end
   end
   return n
+end
+
+-- Statistics of the last `days` days (today included), for the screen:
+-- { days = { {key, visits, ms, zone, players}, ... oldest first }, visits, ms, zone, players,
+--   hours = {24 counts, all time, all players}, avgMs }
+function H.stats(h, now, days, offsetHours)
+  local out = { days = {}, visits = 0, ms = 0, zone = 0, players = 0, hours = {} }
+  local names = {}
+  for i = days - 1, 0, -1 do
+    local k = dayKey(now - i * 86400000, offsetHours)
+    local d = h.days[k]
+    local e = { key = k, visits = d and d.visits or 0, ms = d and d.ms or 0, zone = d and d.zone or 0,
+      players = d and #d.names or 0 }
+    out.days[#out.days + 1] = e
+    out.visits, out.ms, out.zone = out.visits + e.visits, out.ms + e.ms, out.zone + e.zone
+    if d then for _, n in ipairs(d.names) do names[n:lower()] = true end end
+  end
+  for _ in pairs(names) do out.players = out.players + 1 end
+  for i = 1, 24 do out.hours[i] = 0 end
+  for _, p in pairs(h.players) do
+    for i = 1, 24 do out.hours[i] = out.hours[i] + ((p.hours and p.hours[i]) or 0) end
+  end
+  out.avgMs = out.visits > 0 and math.floor(out.ms / out.visits) or 0
+  return out
+end
+
+-- Hour of day (0-23) with the most visits of a player, or nil.
+function H.peakHour(p)
+  local best, n = nil, 0
+  for i = 1, 24 do
+    local c = p.hours and p.hours[i] or 0
+    if c > n then best, n = i - 1, c end
+  end
+  return best
 end
 
 -- "2026-10-19 14:02" in UTC, or with an offset in hours.

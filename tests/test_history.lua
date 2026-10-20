@@ -57,4 +57,49 @@ t.contains(text, "Was in the no-go zone", "zone")
 t.contains(text, "Visits so far: 3", "count")
 t.eq(alerts.format(visit("Me", 0, 5, "trusted")), nil, "trusted visits are not posted")
 
+
+-- statistics: per day, per hour, per player
+local hs = history.new()
+local DAY = 86400000
+local base = 20000 * DAY -- a midnight (UTC)
+history.record(hs, { target = { kind = "player", name = "Ann", cls = "unknown" }, start = base + 14 * 3600000, stop = base + 14 * 3600000 + 600000, closest = 30, enteredZone = true })
+history.record(hs, { target = { kind = "player", name = "Ann", cls = "unknown" }, start = base + DAY + 14 * 3600000, stop = base + DAY + 14 * 3600000 + 60000, closest = 80 })
+history.record(hs, { target = { kind = "player", name = "Ben", cls = "visitor" }, start = base + DAY + 20 * 3600000, stop = base + DAY + 20 * 3600000 + 120000 })
+local st = history.stats(hs, base + DAY + 21 * 3600000, 14)
+t.eq(#st.days, 14, "14 days")
+t.eq(st.days[14].visits, 2, "two visits today")
+t.eq(st.days[13].visits, 1, "one yesterday")
+t.eq(st.days[13].zone, 1, "yesterday's visit was in the zone")
+t.eq(st.visits, 3, "visits in 14 days")
+t.eq(st.players, 2, "two different players")
+t.eq(st.zone, 1, "zone visits")
+t.eq(st.hours[15], 2, "two visits at 14 h")
+t.eq(st.hours[21], 1, "one at 20 h")
+t.eq(st.avgMs, math.floor((600000 + 60000 + 120000) / 3), "average visit")
+local ann = history.get(hs, "Ann")
+t.eq(ann.longestMs, 600000, "longest visit")
+t.eq(ann.closestEver, 30, "closest approach ever")
+t.eq(ann.zoneVisits, 1, "zone visits per player")
+t.eq(history.peakHour(ann), 14, "peak hour")
+local hz = history.new()
+history.record(hz, { target = { kind = "player", name = "Ann", cls = "unknown" }, start = base + 14 * 3600000, stop = base + 14 * 3600000 + 1000 }, 2)
+t.eq(history.stats(hz, base + 15 * 3600000, 14, 2).hours[17], 1, "hours follow the time zone")
+-- saved and loaded again
+local again = history.new(textutils.unserialiseJSON(textutils.serialiseJSON(history.data(hs))))
+t.eq(history.stats(again, base + DAY + 21 * 3600000, 14).visits, 3, "days survive saving")
+-- old file without statistics: rebuilt from the recent visits
+local old = textutils.unserialiseJSON(textutils.serialiseJSON(history.data(hs)))
+old.days = nil
+for _, p in pairs(old.players) do p.hours, p.longestMs, p.closestEver, p.zoneVisits = nil, nil, nil, nil end
+local mig = history.new(old)
+t.eq(history.stats(mig, base + DAY + 21 * 3600000, 14).visits, 3, "statistics rebuilt for old files")
+t.eq(history.get(mig, "Ann").longestMs, 600000, "longest rebuilt")
+-- only KEEP_DAYS days are kept
+local hk = history.new()
+for i = 1, history.KEEP_DAYS + 5 do
+  history.record(hk, { target = { kind = "player", name = "X", cls = "unknown" }, start = base + i * DAY, stop = base + i * DAY + 1000 })
+end
+local nd = 0
+for _ in pairs(hk.days) do nd = nd + 1 end
+t.eq(nd, history.KEEP_DAYS, "old days dropped")
 t.finish("history")

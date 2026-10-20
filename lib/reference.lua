@@ -45,6 +45,8 @@ R.GROUPS = {
     { "screen reset", "Drop the display and create it again (after moving the monitor or the GPU block)." },
     { "screen font <name>", "Font for the screen (default SansSerif). Java names like SansSerif, Monospaced or Dialog always exist." },
     { "screen range <blocks>", "Fixed range of the radar scope: 64, 128, 256 (default), 512 or 1024 blocks. Same as the - and + buttons on the screen." },
+    { "screen show <category|all> on|off", "Show or hide a radar category on the screen: player, ship, shot, contraption, monster, mob, animal, item, misc. Only the screen; alerts stay the same. Same as the chips on the TARGETS page." },
+    { "screen filter", "Which categories the screen shows." },
   } },
   { title = "SHELL: void (outside the radar)", items = {
     { "void list", "Installed apps." },

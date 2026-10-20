@@ -8,6 +8,7 @@ States: idea / in progress / tested in singleplayer / tested on server
 | 0 | Discord test + radar/detector probe | tested in singleplayer |
 | 5 | Radar: target list, lists, ship takeover, no-go zone, visits/history, Discord embeds, siren, autostart/tab | tested in singleplayer (siren, tab and exit not yet tested in game) |
 | 5b | Radar screen on DirectGPU (banner, map, targets, events, visitor stats, touch) | tested on the server; redesign with fixed scope range and zoom buttons built, not in game yet |
+| 5e | Screen: category filter, mob types, STATS tab, LOG tab | built, tested in CraftOS-PC, not in game |
 | 5d | Ragdoll filter (Sable Ragdolls body parts are no ships) | built, tested in CraftOS-PC, not in game |
 | 5c | Remote control from a pocket computer (with arm switch) | idea, build together with 9 |
 | 9 | Cannons via CC:CBC (decided: option B), arm switch, angle limits, fire only on fresh sightings | next big step |

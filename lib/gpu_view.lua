@@ -3,8 +3,12 @@
 --             (tap a blip or a row for details and buttons)
 --   TARGETS   table of everything the radar sees
 --   VISITORS  who was here, how often, how long (tap a name for the history and buttons)
---   EVENTS    the radar log, scrollable
+--   STATS     visits per day, time of day, top visitors
+--   LOG       the radar log, scrollable
 --   CONTROL   siren, zone and sensor settings
+-- Radar categories (players, ships, monsters, animals, ...) can be shown or hidden
+-- with touch chips on the TARGETS page ("screen show <category> on|off"); this only
+-- changes the screen, never the alerts.
 -- A header with the base level stays visible on every tab.
 --
 -- Pure drawing logic: `gpu` is the DirectGPU peripheral (or any table with the same
@@ -30,8 +34,57 @@ V.LIST_COLOR = {
 V.LEVEL = { { 34, 140, 84 }, { 40, 120, 160 }, { 196, 160, 36 }, { 222, 118, 32 }, { 210, 44, 44 } }
 V.TABS = {
   { id = "radar", label = "RADAR" }, { id = "targets", label = "TARGETS" }, { id = "visitors", label = "VISITORS" },
-  { id = "events", label = "EVENTS" }, { id = "control", label = "CONTROL" },
+  { id = "stats", label = "STATS" }, { id = "log", label = "LOG" }, { id = "control", label = "CONTROL" },
 }
+-- radar track categories (Create Radar TrackCategory), screen label, shown by default, blip colour
+V.CATS = {
+  { id = "PLAYER", label = "PLAYER", on = true, color = { 236, 238, 244 } },
+  { id = "SABLE", label = "SHIP", on = true, color = { 236, 238, 244 } },
+  { id = "PROJECTILE", label = "SHOT", on = true, color = { 250, 140, 60 } },
+  { id = "CONTRAPTION", label = "CONTRAPTION", on = true, color = { 110, 180, 205 } },
+  { id = "HOSTILE", label = "MONSTER", on = false, color = { 176, 96, 210 } },
+  { id = "MOB", label = "MOB", on = false, color = { 160, 146, 112 } },
+  { id = "ANIMAL", label = "ANIMAL", on = false, color = { 120, 176, 92 } },
+  { id = "ITEM", label = "ITEM", on = false, color = { 222, 200, 92 } },
+  { id = "MISC", label = "MISC", on = false, color = { 122, 128, 146 } },
+}
+local CAT = {}
+for _, c in ipairs(V.CATS) do CAT[c.id] = c end
+
+-- Category id of a target ("MISC" for anything unknown).
+function V.catOf(t)
+  local c = t.category
+  if t.kind == "player" then c = "PLAYER" elseif t.kind == "ship" then c = "SABLE" end
+  return CAT[c] and c or "MISC"
+end
+
+-- Accepts an id ("ANIMAL") or a screen label ("ship"); returns the id or nil.
+function V.catId(word)
+  word = tostring(word or ""):upper()
+  for _, c in ipairs(V.CATS) do
+    if c.id == word or c.label == word then return c.id end
+  end
+end
+
+function V.shown(cfg, id)
+  local s = cfg.screenShow and cfg.screenShow[id]
+  if s == nil then return CAT[id] and CAT[id].on or false end
+  return s
+end
+
+-- "entity.minecraft.zombie_villager" -> "zombie villager", "entity.alexsmobs.crow" -> "crow", "Sable:ship" -> "ship"
+function V.typeName(entityType)
+  local s = tostring(entityType or "")
+  if s == "" then return nil end
+  s = s:gsub("^entity%.", "")
+  local name = s:match("[%.:]([^%.:]+)$") or s
+  return (name:gsub("_", " "))
+end
+
+local function modOf(entityType)
+  local m = tostring(entityType or ""):match("^entity%.([^%.]+)%.")
+  return m
+end
 -- zoom steps of the scope (blocks from the base centre to the rim)
 V.RANGES = { 64, 128, 256, 512, 1024 }
 V.DEFAULT_RANGE = 256
@@ -74,9 +127,17 @@ function V.model(a)
   local targets = {}
   local here = {}
   local c = cfg.zone and Z.center(cfg.zone) or nil
+  local counts, hidden = {}, 0
   for _, t in ipairs(tracker.all(a.tracker)) do
+    local cat = V.catOf(t)
+    counts[cat] = (counts[cat] or 0) + 1
+    if not V.shown(cfg, cat) then
+      hidden = hidden + 1
+      if t.kind == "player" and t.name then here[t.name:lower()] = true end
+    else
     local d = a.decisions[t.id] or { action = "ignore", cls = "?" }
     local label
+    local typeName = V.typeName(t.entityType)
     if t.kind == "player" then
       label = t.name or tracker.short(t.id)
       if t.name then here[t.name:lower()] = true end
@@ -84,7 +145,7 @@ function V.model(a)
       local e = a.lists.ships[t.id]
       label = "ship " .. ((e and e.label) or tracker.short(t.id))
     else
-      label = tostring(t.category or "?"):lower()
+      label = typeName or tostring(t.category or "?"):lower()
     end
     local extra
     if d.action == "warn" and d.remainingMs then
@@ -98,7 +159,14 @@ function V.model(a)
       pos = t.pos, vel = t.vel, dist = cfg.zone and t.pos and Z.distance(cfg.zone, t.pos) or 0,
       dir = (c and t.pos) and compass(t.pos.x - c.x, t.pos.z - c.z) or "",
       inZone = cfg.zone and Z.contains(cfg.zone, t.pos) or false, extra = extra,
+      cat = cat, catLabel = CAT[cat].label, catColor = CAT[cat].color, entityType = t.entityType,
+      typeName = typeName, mod = modOf(t.entityType),
     }
+    end
+  end
+  local cats = {}
+  for _, cc in ipairs(V.CATS) do
+    cats[#cats + 1] = { id = cc.id, label = cc.label, count = counts[cc.id] or 0, on = V.shown(cfg, cc.id), color = cc.color }
   end
   table.sort(targets, function(x, y)
     local ox, oy = ORDER[x.action] or 9, ORDER[y.action] or 9
@@ -126,6 +194,8 @@ function V.model(a)
     alarm = { muted = muted, volume = cfg.alarmVolume or 3, mutedUntil = cfg.alarmMuteUntil },
     detectRange = cfg.detectRange or 512,
     range = V.validRange(cfg.screenRange) or V.DEFAULT_RANGE,
+    cats = cats, hidden = hidden,
+    stats = hist and history.stats(hist, a.now, 14, cfg.timeOffsetHours) or nil,
   }
 end
 
@@ -133,7 +203,9 @@ end
 function V.signature(model, view)
   local parts = { model.level and model.level.n or 0, #model.log, model.log[#model.log] or "", model.last24h,
     model.visitorCount, view and view.selected or "-", view and view.selectedPlayer or "-", view and view.page or "",
-    view and view.logScroll or 0, model.alarm.muted and 1 or 0, model.alarm.volume, model.range, model.clock }
+    view and view.logScroll or 0, model.alarm.muted and 1 or 0, model.alarm.volume, model.range, model.clock,
+    model.hidden, model.stats and model.stats.visits or 0 }
+  for _, cc in ipairs(model.cats) do parts[#parts + 1] = cc.id .. cc.count .. (cc.on and "+" or "-") end
   local cell = math.max(2, model.range / 48) -- about one blip size on the scope
   for _, t in ipairs(model.targets) do
     local px, pz = 0, 0
@@ -191,7 +263,8 @@ end
 local function box(view, x, y, w, h, col, radius)
   x, y, w, h = math.floor(x), math.floor(y), math.floor(w), math.floor(h)
   if view.rounded then
-    view.gpu.drawRoundedRect(view.d, x, y, w, h, radius or math.max(3, math.floor(view.u * 0.35)), col[1], col[2], col[3], true)
+    radius = math.min(radius or math.max(4, math.floor(view.u * 0.6)), math.floor(math.min(w, h) / 2))
+    view.gpu.drawRoundedRect(view.d, x, y, w, h, radius, col[1], col[2], col[3], true)
   else
     view.gpu.fillRect(view.d, x, y, w, h, col[1], col[2], col[3])
   end
@@ -292,6 +365,7 @@ local function drawStatus(view, m, r)
   if engaged > 0 then right = chip(view, engaged .. " ENGAGED", right, cy, ch, V.COLOR.engage) - pad end
   if warned > 0 then right = chip(view, warned .. " COUNTDOWN", right, cy, ch, V.COLOR.warn) - pad end
   local cnt = ("%d contact%s"):format(#m.targets, #m.targets == 1 and "" or "s")
+  if m.hidden > 0 then cnt = cnt .. (" (+%d hidden)"):format(m.hidden) end
   if right - textWidth(cnt, u) > nameEnd then
     text(view, cnt, right - textWidth(cnt, u), (r[4] - u) / 2 - 1, GRAY, u)
   end
@@ -322,7 +396,12 @@ end
 ---------------------------------------------------------------- detail cards
 local function targetCard(m, t)
   local lines = {}
-  lines[#lines + 1] = { (t.cls or "?") .. "  /  " .. (STATUS_WORD[t.action] or t.action or "?"), V.LIST_COLOR[t.cls] or GRAY }
+  if t.kind ~= "player" and t.kind ~= "ship" then
+    lines[#lines + 1] = { t.catLabel .. (t.mod and ("  /  " .. t.mod) or ""), t.catColor }
+    if t.entityType then lines[#lines + 1] = { tostring(t.entityType), DIM } end
+  else
+    lines[#lines + 1] = { (t.cls or "?") .. "  /  " .. (STATUS_WORD[t.action] or t.action or "?"), V.LIST_COLOR[t.cls] or GRAY }
+  end
   lines[#lines + 1] = { ("%d blocks %s%s"):format(math.floor(t.dist + 0.5), t.dir, t.inZone and "  IN ZONE" or ""),
     t.inZone and V.COLOR.warn or WHITE }
   if t.pos then
@@ -347,7 +426,9 @@ local function targetCard(m, t)
   local who
   if t.kind == "player" and t.name and t.name:match("^[%w_]+$") then who = { name = t.name }
   elseif t.kind == "ship" then who = { name = tracker.short(t.id), ship = true } end
-  return { title = t.label, color = V.COLOR[t.action] or WHITE, lines = lines, who = who }
+  local color = V.COLOR[t.action] or WHITE
+  if t.action == "ignore" then color = t.catColor or GRAY end
+  return { title = t.label, color = color, lines = lines, who = who }
 end
 
 local function playerCard(m, p)
@@ -357,8 +438,17 @@ local function playerCard(m, p)
   lines[#lines + 1] = { "last here " .. age(p.last, m.now) .. " ago", GRAY }
   local h = m.history and history.get(m.history, p.name)
   if h then
+    local avg = h.visits > 0 and math.floor(history.totalMs(h) / h.visits) or 0
+    lines[#lines + 1] = { ("average %s, longest %s"):format(D.format(avg), D.format(h.longestMs or 0)), GRAY }
+    local peak = history.peakHour(h)
+    local bits = {}
+    if h.closestEver then bits[#bits + 1] = "closest " .. h.closestEver .. " m" end
+    if (h.zoneVisits or 0) > 0 then bits[#bits + 1] = h.zoneVisits .. "x in zone" end
+    if peak then bits[#bits + 1] = ("mostly %02d-%02d h"):format(peak, (peak + 1) % 24) end
+    if #bits > 0 then lines[#lines + 1] = { table.concat(bits, ", "), (h.zoneVisits or 0) > 0 and V.COLOR.warn or GRAY } end
+    lines[#lines + 1] = { "first seen " .. history.time(h.first, m.offset):sub(1, 10), DIM }
     for i, v in ipairs(h.recent) do
-      if i > 5 then break end
+      if i > 4 then break end
       lines[#lines + 1] = { ("%s  %s%s"):format(history.time(v.start, m.offset):sub(6), D.format(v.stop - v.start),
         v.zone and "  zone" or ""), DIM }
     end
@@ -534,6 +624,10 @@ local function drawScope(view, m, r)
       px, py = math.floor(px + 0.5), math.floor(py + 0.5)
       local col = V.COLOR[t.action] or V.COLOR.ignore
       local br = math.max(3, math.floor(u * 0.42))
+      if t.action == "ignore" then
+        col = t.catColor or col
+        br = math.max(2, math.floor(u * 0.3))
+      end
       -- heading: where it will be in 5 s (velocity is blocks per tick)
       if t.vel and not outside then
         local vx, vz = t.vel.x * 100 * k, t.vel.z * 100 * k
@@ -566,7 +660,7 @@ local function drawScope(view, m, r)
   local sz = math.floor(u * 0.8)
   for i = #blips, 1, -1 do
     local bl = blips[i]
-    if bl.t.action ~= "ignore" then
+    if bl.t.action ~= "ignore" or bl.t.id == view.selected then
       local label = fit(bl.t.label, 11 * sz * 0.56, sz)
       if bl.outside then label = label .. " " .. math.floor(bl.t.dist + 0.5) end
       local w, h = textWidth(label, sz), sz + 2
@@ -606,17 +700,19 @@ end
 local function contactRow(view, t, x, y, w, h)
   local u = view.u
   local col = V.COLOR[t.action] or V.COLOR.ignore
-  rect(view, { x, y + 2, 3, h - 4 }, col)
-  local sub = math.floor(u * 0.85)
   local word = STATUS_WORD[t.action] or "?"
   if t.action == "warn" and t.extra then word = t.extra end
+  if t.action == "ignore" then col, word = t.catColor or col, t.catLabel or word end
+  rect(view, { x, y + 2, 3, h - 4 }, col)
+  local sub = math.floor(u * 0.85)
   local ch = math.floor(u * 1.3)
   local cl = chip(view, word, x + w - math.floor(u * 0.4), y + (h - ch) / 2, ch, col)
   local tx = x + u * 0.7
   text(view, fit(t.label, cl - tx - u * 0.5, u, true), tx, y + h / 2 - u - 1, WHITE, u, "bold")
   local info = ("%d m %s"):format(math.floor(t.dist + 0.5), t.dir)
   if t.inZone then info = info .. "  IN ZONE" end
-  if t.cls and t.cls ~= "?" then info = info .. "  " .. t.cls end
+  if t.cls and t.cls ~= "?" and t.cls ~= "other" then info = info .. "  " .. t.cls
+  elseif t.mod and t.mod ~= "minecraft" then info = info .. "  " .. t.mod end
   text(view, fit(info, cl - tx - u * 0.5, sub), tx, y + h / 2 + 1, t.inZone and V.COLOR.warn or GRAY, sub)
 end
 
@@ -650,7 +746,32 @@ local function drawRadarPage(view, m, r)
 end
 
 ---------------------------------------------------------------- page: targets
+-- Touch chips to show or hide radar categories. Returns the height used.
+local function drawFilter(view, m, r)
+  local u = view.u
+  local h = math.floor(u * 1.6)
+  local pad = math.floor(u * 0.4)
+  local size = math.floor(u * 0.72)
+  rect(view, { r[1], r[2], r[3], h + 2 * pad }, PANEL)
+  local x = r[1] + pad
+  local y = r[2] + pad
+  local gap = math.floor(u * 0.3)
+  local avail = r[3] - 2 * pad - gap * (#m.cats - 1)
+  local w = math.floor(avail / #m.cats)
+  for _, c in ipairs(m.cats) do
+    local col = c.on and { math.floor(c.color[1] * 0.35), math.floor(c.color[2] * 0.35), math.floor(c.color[3] * 0.35) } or BG
+    box(view, x, y, w, h, col, math.floor(h / 2))
+    local lbl = fit(c.label .. " " .. c.count, w - 6, size, true)
+    text(view, lbl, x + (w - textWidth(lbl, size, true)) / 2, y + (h - size) / 2, c.on and c.color or DIM, size, "bold")
+    addHit(view, x, y, w, h, { kind = "cmd", cmd = ("screen show %s %s"):format(c.id:lower(), c.on and "off" or "on"), stay = true })
+    x = x + w + gap
+  end
+  return h + 2 * pad
+end
+
 local function drawTargetsPage(view, m, r)
+  local fh = drawFilter(view, m, r)
+  r = { r[1], r[2] + fh, r[3], r[4] - fh }
   local sel = view.selected and findTarget(m, view.selected)
   if view.selected and not sel then view.selected = nil end
   local tableR = r
@@ -670,18 +791,24 @@ local function drawTargetsPage(view, m, r)
   for _, t in ipairs(m.targets) do
     local col = V.COLOR[t.action] or V.COLOR.ignore
     local lc = V.LIST_COLOR[t.cls] or GRAY
+    local listWord = t.cls or "?"
+    local statusWord = STATUS_WORD[t.action] or "?"
+    if t.action == "ignore" then
+      col, lc, listWord, statusWord = t.catColor or col, t.catColor or lc, t.catLabel:lower(), t.mod or "-"
+    end
     local dist = tostring(math.floor(t.dist + 0.5))
     local cells
     if sel then
-      cells = { { t.label, WHITE, "bold" }, { STATUS_WORD[t.action] or "?", col }, { dist, WHITE } }
+      cells = { { t.label, WHITE, "bold" }, { statusWord, col }, { dist, WHITE } }
     else
-      cells = { { t.label, WHITE, "bold" }, { t.cls or "?", lc }, { STATUS_WORD[t.action] or "?", col },
+      cells = { { t.label, WHITE, "bold" }, { listWord, lc }, { statusWord, col },
         { dist, t.inZone and V.COLOR.warn or WHITE }, { t.dir, GRAY }, { t.pos and tostring(math.floor(t.pos.y)) or "", GRAY },
         { t.extra or "", V.COLOR.warn } }
     end
     rows[#rows + 1] = { cells = cells, dot = col, hit = { kind = "target", id = t.id }, selected = t.id == view.selected }
   end
-  drawTable(view, tableR, cols, rows, "nothing in range", not sel and "orange distance = inside the no-go zone" or nil)
+  drawTable(view, tableR, cols, rows, m.hidden > 0 and ("nothing shown, %d hidden by the filter"):format(m.hidden) or "nothing in range",
+    not sel and "tap a category above to show or hide it  -  orange distance = inside the no-go zone" or nil)
 end
 
 ---------------------------------------------------------------- page: visitors
@@ -719,7 +846,7 @@ local function drawVisitorsPage(view, m, r)
 end
 
 ---------------------------------------------------------------- page: events
-local function drawEventsPage(view, m, r)
+local function drawLogPage(view, m, r)
   rect(view, r, BG)
   local u = view.u
   local rowH = math.floor(u * 1.55)
@@ -759,6 +886,106 @@ local function drawEventsPage(view, m, r)
   end
 end
 
+---------------------------------------------------------------- page: stats
+-- bar chart: values = { {value, part (drawn red on top), label}, ... }
+local function bars(view, x, y, w, h, values, col, partCol)
+  local u = view.u
+  local maxV = 1
+  for _, v in ipairs(values) do if v[1] > maxV then maxV = v[1] end end
+  local ls = math.floor(u * 0.65)
+  local chartH = h - ls - 4
+  local n = #values
+  local slot = w / n
+  local bw = math.max(2, math.floor(slot * 0.7))
+  line(view, x, y + chartH, x + w, y + chartH, LINE)
+  for i, v in ipairs(values) do
+    local bx = x + (i - 1) * slot + (slot - bw) / 2
+    if v[1] > 0 then
+      local bh = math.max(2, math.floor((chartH - ls - 2) * v[1] / maxV))
+      rect(view, { bx, y + chartH - bh, bw, bh }, col)
+      if v[2] and v[2] > 0 then
+        local ph = math.max(2, math.floor((chartH - ls - 2) * v[2] / maxV))
+        rect(view, { bx, y + chartH - ph, bw, ph }, partCol)
+      end
+      if bw >= ls * 1.2 then
+        local t = tostring(v[1])
+        text(view, t, bx + (bw - textWidth(t, ls)) / 2, y + chartH - bh - ls - 1, GRAY, ls)
+      end
+    end
+    if v[3] then text(view, v[3], bx + (bw - textWidth(v[3], ls)) / 2, y + chartH + 3, DIM, ls) end
+  end
+end
+
+local function drawStatsPage(view, m, r)
+  rect(view, r, BG)
+  local u = view.u
+  local st = m.stats
+  if not st then
+    text(view, "no visits recorded yet", r[1] + u, r[2] + u, DIM, u)
+    return
+  end
+  local gap = u
+  local lw = math.floor((r[3] - 3 * gap) * 0.56)
+  local rw = r[3] - 3 * gap - lw
+  local x, y, h = r[1] + gap, r[2] + gap, r[4] - 2 * gap
+  -- left: last 14 days
+  box(view, x, y, lw, h, PANEL)
+  heading(view, "LAST 14 DAYS", x + u, y + math.floor(u * 0.5))
+  local big = math.floor(u * 1.5)
+  local ky = y + math.floor(u * 1.6)
+  local kw = math.floor((lw - 2 * u) / 4)
+  local function kpi(i, value, label, col)
+    local kx = x + u + (i - 1) * kw
+    text(view, fit(value, kw - 4, big, true), kx, ky, col or WHITE, big, "bold")
+    text(view, label, kx, ky + big + 2, DIM, math.floor(u * 0.72))
+  end
+  kpi(1, tostring(st.visits), "visits")
+  kpi(2, tostring(st.players), "players")
+  local am = math.floor(st.avgMs / 60000)
+  local avg = am >= 60 and ("%dh%02dm"):format(math.floor(am / 60), am % 60) or (am >= 1 and (am .. "m") or (math.floor(st.avgMs / 1000) .. "s"))
+  kpi(3, avg, "average visit")
+  kpi(4, tostring(st.zone), "in the zone", st.zone > 0 and V.COLOR.warn or WHITE)
+  local values = {}
+  for i, d in ipairs(st.days) do
+    local lbl = d.key:sub(9, 10)
+    if i == #st.days then lbl = "today" elseif #st.days > 10 and i % 2 == 0 then lbl = nil end
+    values[#values + 1] = { d.visits, d.zone, lbl }
+  end
+  local cy = ky + big + math.floor(u * 1.6)
+  bars(view, x + u, cy, lw - 2 * u, y + h - cy - math.floor(u * 0.6), values, ACCENT, V.COLOR.warn)
+  -- right: time of day and top visitors
+  local x2 = x + lw + gap
+  local th = math.floor(h * 0.42)
+  box(view, x2, y, rw, th, PANEL)
+  heading(view, "TIME OF DAY (all visits)", x2 + u, y + math.floor(u * 0.5))
+  local hv = {}
+  for i = 1, 24 do hv[i] = { st.hours[i], 0, (i - 1) % 6 == 0 and tostring(i - 1) or nil } end
+  bars(view, x2 + u, y + math.floor(u * 1.5), rw - 2 * u, th - math.floor(u * 1.9), hv, { 90, 140, 200 }, ACCENT)
+  local y2 = y + th + gap
+  local h2 = h - th - gap
+  box(view, x2, y2, rw, h2, PANEL)
+  heading(view, "TOP VISITORS", x2 + u, y2 + math.floor(u * 0.5))
+  local list = {}
+  for _, p in ipairs(m.visitors) do list[#list + 1] = p end
+  table.sort(list, function(a, b)
+    if a.visits ~= b.visits then return a.visits > b.visits end
+    return a.totalMs > b.totalMs
+  end)
+  local rowH = math.floor(u * 1.5)
+  local yy = y2 + math.floor(u * 1.6)
+  for i, p in ipairs(list) do
+    if yy + rowH > y2 + h2 then break end
+    local lc = V.LIST_COLOR[p.cls] or GRAY
+    circle(view, x2 + u * 1.2, yy + rowH / 2 - 1, u * 0.3, lc, true)
+    text(view, fit(p.name, rw * 0.45, u, true), x2 + u * 2, yy + (rowH - u) / 2, WHITE, u, "bold")
+    local right = ("%dx  %s"):format(p.visits, D.format(p.totalMs))
+    text(view, right, x2 + rw - u - textWidth(right, u), yy + (rowH - u) / 2, GRAY, u)
+    addHit(view, x2, yy, rw, rowH, { kind = "player", name = p.name, page = "visitors" })
+    yy = yy + rowH
+  end
+  if #list == 0 then text(view, "nobody yet", x2 + u, yy, DIM, u) end
+end
+
 ---------------------------------------------------------------- page: control
 local function drawControlPage(view, m, r)
   rect(view, r, BG)
@@ -776,7 +1003,7 @@ local function drawControlPage(view, m, r)
   local yy = y + gap + u * 1.4
   local big = math.floor(u * 1.4)
   text(view, m.alarm.muted and "MUTED" or "ON", px, yy, m.alarm.muted and V.COLOR.warn or V.COLOR.friendly, big, "bold")
-  local note = "Siren: on, sounds during countdowns"
+  local note = "Siren: on"
   if m.alarm.muted and m.alarm.mutedUntil then
     note = "Siren: muted until " .. history.time(m.alarm.mutedUntil, m.offset):sub(-5)
   end
@@ -831,7 +1058,8 @@ function V.draw(view, m)
   local page = view.page
   if page == "targets" then drawTargetsPage(view, m, L.content)
   elseif page == "visitors" then drawVisitorsPage(view, m, L.content)
-  elseif page == "events" then drawEventsPage(view, m, L.content)
+  elseif page == "log" then drawLogPage(view, m, L.content)
+  elseif page == "stats" then drawStatsPage(view, m, L.content)
   elseif page == "control" then drawControlPage(view, m, L.content)
   else drawRadarPage(view, m, L.content) end
 end
@@ -857,6 +1085,7 @@ function V.click(view, x, y, now)
     view.selected, view.selectedAt = h.id, now
     return nil, true
   elseif h.kind == "player" then
+    if h.page then view.page = h.page end
     view.selectedPlayer, view.selectedAt = h.name, now
     return nil, true
   elseif h.kind == "back" then

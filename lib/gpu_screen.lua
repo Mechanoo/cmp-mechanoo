@@ -134,6 +134,11 @@ function S.test(s)
     g.drawLine(v.d, 0, 0, v.W - 1, v.H - 1, 255, 255, 255)
     g.drawLine(v.d, v.W - 1, 0, 0, v.H - 1, 255, 255, 255)
     g.drawCircle(v.d, math.floor(v.W / 2), math.floor(v.H / 2), math.floor(v.H / 4), 0, 255, 255, false)
+    if v.rounded then -- rounded boxes with radius 4, 10 and 20 px
+      for i, rad in ipairs({ 4, 10, 20 }) do
+        g.drawRoundedRect(v.d, 50 + (i - 1) * 70, math.floor(v.H / 2) + 10, 60, 50, rad, 255, 120, 0, true)
+      end
+    end
     g.drawText(v.d, ("TEST %dx%d  font %s"):format(v.W, v.H, v.font), 50, 30, 255, 255, 255, v.font, v.u, "plain")
     g.updateDisplay(v.d)
     s.holdUntil = now() + 10000 -- show the pattern 10 s, then the radar again

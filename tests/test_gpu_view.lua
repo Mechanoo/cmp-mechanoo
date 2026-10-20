@@ -168,8 +168,17 @@ t.contains(joined, "TOTAL TIME", "visitors table header")
 t.contains(joined, "Steve", "visitors: Steve")
 t.contains(joined, "20m00s", "visitors: Steve total time")
 t.contains(joined, "Bob", "visitors: Bob")
-joined = gotoTab("events")
-t.contains(joined, "CONTACT Steve", "events page: log line")
+joined = gotoTab("log")
+t.contains(joined, "CONTACT Steve", "log page: log line")
+joined = gotoTab("stats")
+t.contains(joined, "LAST 14 DAYS", "stats page")
+t.contains(joined, "TOP VISITORS", "stats: top visitors")
+t.contains(joined, "Steve", "stats: Steve listed")
+local topHit = findHit(function(h) return h.kind == "player" and h.name == "Steve" end)
+tap(topHit)
+t.eq(view.page, "visitors", "tap on a top visitor opens the visitors page")
+t.eq(view.selectedPlayer, "Steve", "with Steve selected")
+view.selectedPlayer = nil
 joined = gotoTab("control")
 t.contains(joined, "MUTE SIREN 10m", "control: mute button")
 t.contains(joined, "Siren: on", "control: siren state")
@@ -184,7 +193,7 @@ t.truthy(volDown, "volume - from 3 asks for 2")
 
 -- events scrolling
 for i = 1, 40 do args.log[#args.log + 1] = "[12:" .. i .. "]   filler " .. i end
-gotoTab("events")
+gotoTab("log")
 local up = findHit(function(h) return h.kind == "scroll" and h.delta > 0 end)
 tap(up)
 t.eq(view.logScroll, 5, "UP scrolls back in the log")
@@ -246,7 +255,7 @@ t.contains(joined, "1 visit, 1m40s total", "player card: totals")
 t.truthy(findHit(function(h) return h.kind == "cmd" and h.cmd == "hostile Bob" end), "player card: hostile Bob")
 
 -- level 4+ jumps back to the radar page
-gotoTab("events")
+gotoTab("log")
 local hot = V.model(args)
 hot.level = { n = 4, label = "WARNING" }
 view.lastLevel = 1
@@ -261,6 +270,52 @@ for _, p in ipairs(V.TABS) do
 end
 t.truthy(true, "empty model draws on every page")
 view.page = "radar"
+
+-- radar categories: hidden by default, chips toggle them, mob details
+t.eq(V.typeName("entity.minecraft.zombie_villager"), "zombie villager", "type name from the entity type")
+t.eq(V.typeName("entity.alexsmobs.crow"), "crow", "modded type name")
+t.eq(V.catId("ship"), "SABLE", "category by screen label")
+t.eq(V.catId("animal"), "ANIMAL", "category by id")
+local trC = tracker.new()
+tracker.update(trC, NOW, {
+  { id = "cow1", category = "ANIMAL", entityType = "entity.minecraft.cow", position = { x = 10, y = 64, z = 10 }, velocity = { x = 0, y = 0, z = 0 } },
+  { id = "zom1", category = "HOSTILE", entityType = "entity.minecraft.zombie", position = { x = -20, y = 64, z = 5 }, velocity = { x = 0, y = 0, z = 0 } },
+  { id = "arrow", category = "PROJECTILE", entityType = "entity.minecraft.arrow", position = { x = 0, y = 70, z = 0 }, velocity = { x = 1, y = 0, z = 0 } },
+}, {}, ls)
+local cfgC = { zone = cfg.zone }
+local function modelC() return V.model({ now = NOW, cfg = cfgC, tracker = trC, decisions = {}, lists = ls, history = hist, level = level, log = {} }) end
+local mc = modelC()
+t.eq(#mc.targets, 1, "only the projectile is shown by default")
+t.eq(mc.hidden, 2, "cow and zombie hidden")
+t.eq(mc.targets[1].label, "arrow", "label from the entity type")
+view.lastLevel = 5 -- no jump to the radar page in this part
+gotoTab("targets")
+joined = frame(mc)
+t.contains(joined, "ANIMAL 1", "filter chip with count")
+t.contains(joined, "+2 hidden", "header counts hidden targets")
+local chip = findHit(function(h) return h.kind == "cmd" and h.cmd == "screen show animal on" end)
+t.truthy(chip, "animal chip turns animals on")
+local ca = tap(chip)
+t.eq(view.page, "targets", "chip keeps the page")
+commands.run({ lists = ls, tracker = trC, config = cfgC, now = NOW }, ca.cmd)
+t.eq(cfgC.screenShow.ANIMAL, true, "animals shown after the tap")
+mc = modelC()
+t.eq(#mc.targets, 2, "cow now listed")
+local cow
+for _, x in ipairs(mc.targets) do if x.id == "cow1" then cow = x end end
+t.eq(cow and cow.label, "cow", "cow label")
+view.selected, view.selectedAt = "cow1", NOW
+joined = frame(mc)
+t.contains(joined, "entity.minecraft.cow", "card shows the full entity type")
+t.contains(joined, "ANIMAL", "card shows the category")
+t.eq(findHit(function(h) return h.kind == "cmd" and h.cmd:find("trust") end), nil, "no trust buttons for a cow")
+view.selected = nil
+local rr2 = commands.run({ lists = ls, tracker = trC, config = cfgC, now = NOW }, "screen show all off")
+t.eq(#modelC().targets, 0, "all off hides everything")
+t.contains(table.concat(rr2.lines, " "), "player off", "screen show reports the state")
+commands.run({ lists = ls, tracker = trC, config = cfgC, now = NOW }, "screen show unicorn on")
+t.eq(cfgC.screenShow.UNICORN, nil, "unknown category rejected")
+gotoTab("radar")
 
 -- controller: attach, draw, touch, errors
 local real = peripheral

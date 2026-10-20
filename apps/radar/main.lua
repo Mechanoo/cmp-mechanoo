@@ -82,7 +82,7 @@ local cfg = store.readJson(CONFIG_FILE, {})
 cfg.visitorDefaultMs = cfg.visitorDefaultMs or 30 * 60000
 cfg.intervalS = cfg.intervalS or 1
 local ls = lists.new(store.readJson(LISTS_FILE, nil))
-local hist = history.new(store.readJson(HISTORY_FILE, nil))
+local hist = history.new(store.readJson(HISTORY_FILE, nil), cfg.timeOffsetHours)
 -- versions before this fix recorded the entity type "minecraft:player" as a name
 for k in pairs(hist.players) do
   if k:find(":", 1, true) then hist.players[k] = nil end
@@ -302,7 +302,7 @@ local function handle(ev)
     local h = history.get(hist, t0.name)
     ev.visit = (h and h.visits or 0) + 1
   end
-  if ev.type == "visit_end" and history.record(hist, ev) then
+  if ev.type == "visit_end" and history.record(hist, ev, cfg.timeOffsetHours) then
     ev.visits = history.get(hist, ev.target.name).visits
     store.writeJson(HISTORY_FILE, history.data(hist))
     hist.dirty = false
